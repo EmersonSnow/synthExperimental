@@ -1,8 +1,11 @@
 #pragma once
 
 #include "ofMain.h"
+#define MIDI_NOTE_NUMBER 128
 #define PANNING_TABLE_SIZE 16385
 #define WAVETABLE_SIZE 65536
+#define WAVETABLE_OSCILLATED_SIZE 65536
+#define WAVETABLE_OSCILLATED_MAX 6
 #define AUDIO_BUFFER_SIZE 4096
 #define AUDIO_SAMPLE_RATE 44100
 #define AUDIO_CHANNEL_NUMBER 2
@@ -35,6 +38,43 @@ struct Panning
 class zelmSynthUtil
 {
 public:
+    static void init()
+    {
+        generateNoteFrequencies();
+        generatePanning();
+        generateWavetable();
+        generateOscillatedFrequencies();
+    }
+    static void generateNoteFrequencies()
+    {
+        int noteCount = 0;
+        double a;
+        double currentFrequency = 8.1757989156;
+        for (int i = 0; i < 9; i++, noteCount++)
+        {
+            a = (i / 12.0);
+            double frequency = (currentFrequency*pow(2.0, a));
+            noteFrequencies[noteCount] = frequency;
+        }
+        
+        currentFrequency = 13.75; //Work out from A-1, 9, because it's pitch with two or less floats
+        noteFrequencies[noteCount] = currentFrequency;
+        for (int o = 0; o < 10; o++)
+        {
+            for (int i = 1; i <= 12; i++, noteCount++)
+            {
+                if ((o == 9) & (i == 11))
+                    break;
+                a = (i / 12.0);
+                double frequency = (currentFrequency*pow(2.0, a));
+                noteFrequencies[noteCount] = frequency;
+                if (i == 12)
+                {
+                    currentFrequency = frequency;
+                }
+            }
+        }
+    }
     static void generatePanning()
     {
         float mappedIndex;
@@ -92,6 +132,82 @@ public:
         }
     }
     
+    static float getWavetableValue(int index)
+    {
+        return wavetable[index];
+    }
+    
+    static void generateOscillatedFrequencies()
+    {
+        int numSummed = 2;
+        float increment;
+        
+        for (int i = 0; i < MIDI_NOTE_NUMBER; i ++)
+        {
+            for (int o = 0; o < WAVETABLE_OSCILLATED_MAX; o++)
+            {
+                
+                //float phase[numSummed];
+                //float phaseInit[numSummed];
+                //float phaseIncrements[numSummed];
+                
+                int numPart = 0;
+                float partMult[numSummed];
+                float partAmp[numSummed];
+                float phaseInit[numSummed];
+                float indexIncrement[numSummed];
+                float index[numSummed];
+                increment = (WAVETABLE_SIZE / AUDIO_SAMPLE_RATE)/*WAVETABLE_OSCILLATED_SIZE*/ * noteFrequencies[i];
+                partMult[0] = 1.0;
+                partAmp[0] = 1.0;
+                
+                for (int n = 1; n < numSummed; n++)
+                {
+                    partMult[n] = (2*n) -1;
+                    partAmp[n] = 1 / partMult[n];
+                }
+                for (int p = 0; p < numSummed; p++)
+                {
+                    phaseInit[p] = 0;
+                }
+                for (int p = 0; p < numSummed; p++)
+                {
+                    indexIncrement[numPart] = increment * partMult[p];
+                    index[numPart] = (phaseInit[p]/TWO_PI)*WAVETABLE_SIZE;
+                    if (indexIncrement[numPart] < (WAVETABLE_SIZE/2))
+                        numPart++;
+                }
+                cout << numPart << " numPart " << i << " " << o << "\n";
+                float value = 0;
+                for (int n = 0; n < WAVETABLE_OSCILLATED_SIZE; n++)
+                {
+                    value = 0;
+                    for (int p = 0; p < numPart; p++)
+                    {
+                        value += wavetable[(int)index[p]] * partAmp[p];
+                        index[p] += indexIncrement[p];
+                        if (index[p] >= WAVETABLE_OSCILLATED_SIZE)
+                            index[p] -= WAVETABLE_OSCILLATED_SIZE;
+                    }
+                    wavetableOscillated[i][o][n] = value;
+                }
+            }
+            numSummed++;
+        }
+    }
+    static int getOscillatedWavetableIndex(float frequency)
+    {
+        for (int i = 0; i < MIDI_NOTE_NUMBER; i++)
+        {
+            if (noteFrequencies[i] == frequency)
+                return i;
+        }
+    }
+    static float getOscillatedWavetableValue(int midiNote, int numOscillated, int sampleIndex)
+    {
+        //TODO: Checks
+        return wavetableOscillated[midiNote][numOscillated][sampleIndex];
+    }
     /*static void generateSummedWavetables()
      {
      int numSummed = 2;
@@ -105,19 +221,18 @@ public:
      
      }*/
     
-    static float getWavetableValue(int index)
-    {
-        return wavetable[index];
-    }
-    
 private:
+    static float noteFrequencies[MIDI_NOTE_NUMBER];
+    
     static PanningData panningLinear;
     static PanningData panningSquared;
     static PanningData panningSine;
     
     //static float wavetable[2][WAVETABLE_SIZE+1];
     static float wavetable[WAVETABLE_SIZE+1];
+    static float wavetableOscillated[MIDI_NOTE_NUMBER][WAVETABLE_OSCILLATED_MAX][WAVETABLE_OSCILLATED_SIZE];
     //static vector<vector<float>> wavetables;
+    
     
 };
 class SoundObject : public ofBaseSoundOutput
@@ -629,7 +744,38 @@ private:
     
 };
 
-
+class OscillatedWavetable : public SoundObject
+{
+public:
+    void setup(float frequency, int numOsc)
+    {
+        this->frequency = frequency;
+        this->numOsc = numOsc;
+        panning.left = 1.0;
+        panning.right = 1.0;
+    }
+    
+    void processAudio(ofSoundBuffer &in, ofSoundBuffer &out)
+    {
+        int numFrames = out.getNumFrames();
+        int numChannels = out.getNumChannels();
+        for (int i = 0; i < numFrames; i++)
+        {
+            //cout << zelmSynthUtil::getOscillatedWavetableValue(zelmSynthUtil::getOscillatedWavetableIndex(frequency), 4, sampleIndex) << "\n";
+            out[i*numChannels] = zelmSynthUtil::getOscillatedWavetableValue(zelmSynthUtil::getOscillatedWavetableIndex(frequency), numOsc, sampleIndex) * 1.0 * panning.left;
+            out[i*numChannels+1] = zelmSynthUtil::getOscillatedWavetableValue(zelmSynthUtil::getOscillatedWavetableIndex(frequency), numOsc, sampleIndex) * 1.0 * panning.right;
+            if (++sampleIndex == (WAVETABLE_SIZE))
+            {
+                sampleIndex = 0;
+            }
+        }
+    }
+private:
+    int sampleIndex = 0;
+    int numOsc;
+    float frequency;
+    Panning panning;
+};
 class ofApp : public ofBaseApp{
 
 	public:
@@ -655,5 +801,8 @@ class ofApp : public ofBaseApp{
     StoreUnalteredSoundInTable storeUnalteredSoundInTable4;
     StoreUnalteredSoundInTable storeUnalteredSoundInTable5;
     AudioMixer audioMixer;
+    
+    OscillatedWavetable osciallatedWavetable;
         ofSoundStream soundStream;
+    
 };

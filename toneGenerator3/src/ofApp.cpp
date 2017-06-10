@@ -1,16 +1,18 @@
 #include "ofApp.h"
+
+float zelmSynthUtil::noteFrequencies[MIDI_NOTE_NUMBER];
 PanningData zelmSynthUtil::panningLinear;
 PanningData zelmSynthUtil::panningSquared;
 PanningData zelmSynthUtil::panningSine;
 float zelmSynthUtil::wavetable[WAVETABLE_SIZE+1];
+float zelmSynthUtil::wavetableOscillated[MIDI_NOTE_NUMBER][WAVETABLE_OSCILLATED_MAX][WAVETABLE_OSCILLATED_SIZE];
 
 //--------------------------------------------------------------
 void ofApp::setup(){
-    zelmSynthUtil::generatePanning();
-    zelmSynthUtil::generateWavetable();
+    zelmSynthUtil::init();
     soundStream.setup(AUDIO_CHANNEL_NUMBER, 0, AUDIO_SAMPLE_RATE, AUDIO_BUFFER_SIZE, 1);
     
-    storeUnalteredSoundInTable.setup(392.00, SineWave, 44100);
+    /*storeUnalteredSoundInTable.setup(392.00, SineWave, 44100);
     storeUnalteredSoundInTable.addSegment(2.0, 0.0, 1.0, 0.2);
     storeUnalteredSoundInTable.addSegment(2.0, 1.0, 0.0, 0.2);
     storeUnalteredSoundInTable.start();
@@ -39,13 +41,16 @@ void ofApp::setup(){
     audioMixer.addInput(&storeUnalteredSoundInTable2);
     audioMixer.addInput(&storeUnalteredSoundInTable3);
     audioMixer.addInput(&storeUnalteredSoundInTable4);
-    audioMixer.addInput(&storeUnalteredSoundInTable5);
-    audioMixer.startRecord();
-    audioMixer.setMasterVolume(1.0);
-    audioMixer.setPanning(0.0, PanningLinear);
+    audioMixer.addInput(&storeUnalteredSoundInTable5);*/
     
+    //audioMixer.startRecord();
     
-    soundStream.setOutput(storeUnalteredSoundInTable);
+    osciallatedWavetable.setup(440.0, 1);
+    //audioMixer.addInput(&osciallatedWavetable);
+    //audioMixer.setMasterVolume(1.0);
+    //audioMixer.setPanning(0.0, PanningLinear);
+    
+    soundStream.setOutput(osciallatedWavetable);
 }
 
 //--------------------------------------------------------------
