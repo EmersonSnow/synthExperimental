@@ -1,10 +1,15 @@
 #pragma once
 
 #include "ofMain.h"
+#include "ofxXmlSettings.h"
+
+#define TWO_DIVIDE_PI 2.0/PI
+#define FILE_WRITE_BUFFER_SIZE 4096
 #define MIDI_NOTE_NUMBER 128
-#define PANNING_TABLE_SIZE 16385
+#define PANNING_TABLE_SIZE 8016
 #define WAVETABLE_SIZE 65536
-#define WAVETABLE_OSCILLATED_SIZE 65536
+//#define WAVETABLE_OSCILLATED_SIZE 2621440
+#define WAVETABLE_OSCILLATED_SIZE 4809
 #define WAVETABLE_OSCILLATED_MAX 6
 #define AUDIO_BUFFER_SIZE 4096
 #define AUDIO_SAMPLE_RATE 44100
@@ -43,7 +48,14 @@ public:
         generateNoteFrequencies();
         generatePanning();
         generateWavetable();
-        generateOscillatedFrequencies();
+        //ofDirectory directory(ofToDataPath("oscillated_wavetable"));
+        //if (directory.exists())
+        //{
+        //    loadOscillatedWavetable();
+        //} else
+        //{
+        //   generateOscillatedFrequencies();
+        //}
     }
     static void generateNoteFrequencies()
     {
@@ -142,11 +154,18 @@ public:
         int numSummed = 2;
         float increment;
         
+        ofFile file;
+        string filePath;
         for (int i = 0; i < MIDI_NOTE_NUMBER; i ++)
         {
             for (int o = 0; o < WAVETABLE_OSCILLATED_MAX; o++)
             {
+                filePath = "oscillated_wavetable/"+ofToString(i)+"/"+ofToString(o)+".txt";
+                if (file.doesFileExist(filePath))
+                    file.removeFile(filePath);
                 
+                file.open(ofToDataPath(filePath), ofFile::WriteOnly);
+                file.create();
                 //float phase[numSummed];
                 //float phaseInit[numSummed];
                 //float phaseIncrements[numSummed];
@@ -177,30 +196,111 @@ public:
                     if (indexIncrement[numPart] < (WAVETABLE_SIZE/2))
                         numPart++;
                 }
-                cout << numPart << " numPart " << i << " " << o << "\n";
+                cout << numPart << " numPart " << i << " midiNote " << o << " Oscillator number\n";
                 float value = 0;
-                for (int n = 0; n < WAVETABLE_OSCILLATED_SIZE; n++)
+                for (int n = 1; n < WAVETABLE_OSCILLATED_SIZE+1; n++)
                 {
-                    value = 0;
+                    value = 0; //Ignore first value because it always 1
                     for (int p = 0; p < numPart; p++)
                     {
                         value += wavetable[(int)index[p]] * partAmp[p];
                         index[p] += indexIncrement[p];
-                        if (index[p] >= WAVETABLE_OSCILLATED_SIZE)
-                            index[p] -= WAVETABLE_OSCILLATED_SIZE;
+                        if (index[p] >= WAVETABLE_SIZE)
+                            index[p] -= WAVETABLE_SIZE;
                     }
-                    wavetableOscillated[i][o][n] = value;
+                    wavetableOscillated[i][o][n-1] = value;
+                    file << n << " " << value << "\n"; //TEMP
+                    //bufferStream << value << "\n";
+                    //wavetableOscillatedBuffer[i][o].writeTo(bufferStream);
+                    //bufferStream.clear();
                 }
+                file.close();
+                filePath.clear();
             }
+            cout << "Midi note finished " << i << "\n";
             numSummed++;
         }
+        //saveOscillatedWavetable();
     }
+    static void loadOscillatedWavetable()
+    {
+        ofBuffer buffer;
+        for (int i = 0; i < MIDI_NOTE_NUMBER; i ++)
+        {
+            for (int o = 0; o < WAVETABLE_OSCILLATED_MAX; o++)
+            {
+                buffer = ofBufferFromFile(ofToDataPath("oscillated_wavetable/"+ofToString(i)+"/"+ofToString(o)+".txt"));
+                ofBuffer::Lines lines = buffer.getLines();
+                ofBuffer::Line iter = lines.begin();
+                
+                while (iter != lines.end())
+                {
+                    cout << "LINE: " << (*iter) << endl;
+                    iter++;
+                }
+                
+                buffer.clear();
+            }
+        }
+    }
+    /*static void saveOscillatedWavetable()
+    {
+        //Save in seperate files in case it easier to load them on run time, which I doubt because it a large number of floats
+        XML.clear();
+        for (int i = 0; i < MIDI_NOTE_NUMBER; i++)
+        {
+            for (int o = 0; o < WAVETABLE_OSCILLATED_MAX; o++)
+            {
+                XML.addChild("OSCILLATOR_"+ofToString(o));
+                XML.setTo("OSCILLATOR_"+ofToString(o));
+                for (int s = 0; s < WAVETABLE_OSCILLATED_SIZE; s++)
+                {
+                    XML.addValue(ofToString(s), wavetableOscillated[i][o][s]);
+                }
+                XML.setTo("../");
+            }
+            XML.save("Oscillator_note_"+ofToString(i));
+            XML.clear();
+        }
+    }*/
+    /*static void saveOscillatedWavetable()
+    {
+        //Save in seperate files in case it easier to load them on run time, which I doubt because it a large number of floats
+        //ofFile file;
+        for (int i = 0; i < MIDI_NOTE_NUMBER; i++)
+        {
+            for (int o = 0; o < WAVETABLE_OSCILLATED_MAX; o++)
+            {
+                string path = ofToDataPath("wavetable_oscillated/"+ofToString(i)+"/"+ofToString(o)+".txt");
+                ofFile file(path, ofFile::ReadWrite, false);
+                if (file.exists())
+                {
+                    file.removeFile(path);
+                    file.open(path, ofFile::ReadWrite, false);
+                    file.create();
+                }
+                //fstream file(path.c_str(), ios::out | ios::binary);
+                //file.seekp(0, ios::beg);
+                for (int s = 0; s < WAVETABLE_OSCILLATED_SIZE; s++)
+                {
+                    
+                    //file.write(wavetableOscillated[i][o][s],
+                }
+                //XML.setTo("../");
+            }
+            //XML.save("Oscillator_note_"+ofToString(i));
+            //XML.clear();
+        }
+    }*/
     static int getOscillatedWavetableIndex(float frequency)
     {
         for (int i = 0; i < MIDI_NOTE_NUMBER; i++)
         {
             if (noteFrequencies[i] == frequency)
+            {
+                //cout << "MIDI NOTE " << i << "\n";
                 return i;
+            }
         }
     }
     static float getOscillatedWavetableValue(int midiNote, int numOscillated, int sampleIndex)
@@ -231,6 +331,8 @@ private:
     //static float wavetable[2][WAVETABLE_SIZE+1];
     static float wavetable[WAVETABLE_SIZE+1];
     static float wavetableOscillated[MIDI_NOTE_NUMBER][WAVETABLE_OSCILLATED_MAX][WAVETABLE_OSCILLATED_SIZE];
+    //static ofBuffer wavetableOscillatedBuffer[MIDI_NOTE_NUMBER][WAVETABLE_OSCILLATED_MAX];
+    //static ofXml XML;
     //static vector<vector<float>> wavetables;
     
     
@@ -299,6 +401,7 @@ public:
         short myBlockAlign = 2 * bitsPerSample/8;
         int myChunkSize = 36 + recordData.size()*bitsPerSample/8;
         int myDataSize = recordData.size()*bitsPerSample/8;
+        cout << "myDataSize " << myDataSize << "\n";
         int channels = 2;
         int samplerate = AUDIO_SAMPLE_RATE;
         
@@ -317,12 +420,12 @@ public:
         file.write ("data", 4);
         file.write ((char*) &myDataSize, 4);
         
-#define WRITE_BUFF_SIZE 4096
+
         
-        short writeBuff[WRITE_BUFF_SIZE];
+        short writeBuff[FILE_WRITE_BUFFER_SIZE];
         int pos = 0;
         while(pos<recordData.size()) {
-            int len = MIN(WRITE_BUFF_SIZE, recordData.size()-pos);
+            int len = MIN(FILE_WRITE_BUFFER_SIZE, recordData.size()-pos);
             for(int i = 0; i < len; i++) {
                 writeBuff[i] = (int)(recordData[pos]*32767.f);
                 pos++;
@@ -345,7 +448,7 @@ private:
     
 };
 
-class AudioMixer : public SoundObject
+class zelmAudioMixer : public SoundObject
 {
 public:
     
@@ -426,21 +529,21 @@ public:
         }
         bGenerated = true;
     }
-    void generateMappedCurve(float startVolume, float endVolume)
+    void generateMappedCurve(float volumeStart, float volumeEnd)
     {
         if (!bGenerated)
             return;
-        if (startVolume < endVolume)
+        if (volumeStart < volumeEnd)
         {
             for (int i = 0; i < curve.size(); i++)
             {
-                curveMapped.push_back(ofMap(curve[i], 0.0, 1.0, startVolume, endVolume, false));
+                curveMapped.push_back(ofMap(curve[i], 0.0, 1.0, volumeStart, volumeEnd, false));
             }
         } else
         {
             for (int i = 0; i < curve.size(); i++)
             {
-                curveMapped.push_back(ofMap(curve[i], 1.0, 0.0, startVolume, endVolume, false));
+                curveMapped.push_back(ofMap(curve[i], 1.0, 0.0, volumeStart, volumeEnd, false));
             }
         }
     }
@@ -490,20 +593,21 @@ struct Segment
     bool bVolumeChange;
     int sampleDuration;
     float duration;
-    float startVolume;
-    float endVolume;
+    float volumeStart;
+    float volumeEnd;
     CurveExponentGenerator curveExponentGenerator;
     
     int curveIndex;
 };
 
-class StoreUnalteredSoundInTable : public SoundObject
+class ToneGenerator3 : public SoundObject
 {
 public:
-    void setup(float frequency, WaveType waveType, int sampleRate)
+    void setup(/*float frequency,*/ WaveType waveType, int sampleRate)
     {
-        this->frequency = frequency;
+        this->frequency = 440.0; //Set 440.0 by as a placeholder
         this->waveType = waveType;
+        this->sampleRate = sampleRate;
         
         panning.left = 1.0;
         panning.right = 1.0;
@@ -527,46 +631,152 @@ public:
             {
                 phase = 0;
                 phaseIncrement = (TWO_PI / sampleRate) * frequency;
-                twoDividePI = 2.0/PI;
             }
         }
         
-        bSoundAltered = true;
+        bAudioChanged = true;
         bSoundSamplePeriodFinished = false;
     }
-    void addSegment(float duration, float startVolume, float endVolume, float exponential, bool bSineWaveOscillator = false, int numberOscillator = 0)
+    void setWaveType(WaveType waveType)
+    {
+        this->waveType = waveType;
+        switch(waveType)
+        {
+            case SineWave:
+            {
+                //wavetableGenerator.generate(sampleRate);
+                phase = 0;
+                float freTI = WAVETABLE_SIZE / (float)sampleRate;
+                phaseIncrement = freTI * frequency;
+                break;
+            }
+            case SawtoothWave:
+            {
+                phase = -1;
+                phaseIncrement = (2 * frequency) / sampleRate;
+                break;
+            }
+            case TriangleWave:
+            {
+                phase = 0;
+                phaseIncrement = (TWO_PI / sampleRate) * frequency;
+            }
+        }
+        bAudioChanged = true;
+    }
+    void setFrequency(float frequency)
+    {
+        this->frequency = frequency;
+        switch(waveType)
+        {
+            case SineWave:
+            {
+                //wavetableGenerator.generate(sampleRate);
+                phase = 0;
+                float freTI = WAVETABLE_SIZE / (float)sampleRate;
+                phaseIncrement = freTI * frequency;
+                break;
+            }
+            case SawtoothWave:
+            {
+                phase = -1;
+                phaseIncrement = (2 * frequency) / sampleRate;
+                break;
+            }
+            case TriangleWave:
+            {
+                phase = 0;
+                phaseIncrement = (TWO_PI / sampleRate) * frequency;
+            }
+        }
+        bAudioChanged = true;
+    }
+    void addSegment(float duration, float volumeStart, float volumeEnd, float exponential, bool bSineWaveOscillator = false, int numberOscillator = 0)
     {
         Segment temp;
         temp.duration = duration;
-        temp.startVolume = startVolume;
-        temp.endVolume = endVolume;
+        temp.volumeStart = volumeStart;
+        temp.volumeEnd = volumeEnd;
         temp.sampleDuration = duration * AUDIO_SAMPLE_RATE;
-        if (startVolume == endVolume)
+        if (volumeStart == volumeEnd)
         {
             temp.bVolumeChange = false;
         } else
         {
             temp.curveExponentGenerator.generate(duration, exponential,
-                                                 (startVolume < endVolume) ? true : false, AUDIO_SAMPLE_RATE);
-            temp.curveExponentGenerator.generateMappedCurve(startVolume, endVolume);
+                                                 (volumeStart < volumeEnd) ? true : false, AUDIO_SAMPLE_RATE);
+            temp.curveExponentGenerator.generateMappedCurve(volumeStart, volumeEnd);
             temp.bVolumeChange = true;
         }
         segments.push_back(temp);
         
-        bSoundAltered = true;
+        bAudioChanged = true;
+    }
+    void insertSegment(int position, float duration, float volumeStart, float volumeEnd, float exponential, bool bSineWaveOscillator = false, int numberOscillator = 0)
+    {
+        if (segments.size() <= position)
+            return;
+        
+        Segment temp;
+        temp.duration = duration;
+        temp.volumeStart = volumeStart;
+        temp.volumeEnd = volumeEnd;
+        temp.sampleDuration = duration * AUDIO_SAMPLE_RATE;
+        if (volumeStart == volumeEnd)
+        {
+            temp.bVolumeChange = false;
+        } else
+        {
+            temp.curveExponentGenerator.generate(duration, exponential,
+                                                 (volumeStart < volumeEnd) ? true : false, AUDIO_SAMPLE_RATE);
+            temp.curveExponentGenerator.generateMappedCurve(volumeStart, volumeEnd);
+            temp.bVolumeChange = true;
+        }
+        segments.insert(segments.begin()+position, temp);
+        
+        bAudioChanged = true;
+    }
+    void addCutoff(float duration, float volumeStart, float volumeEnd, float exponential)
+    {
+        cutoff.duration = duration;
+        cutoff.volumeStart = volumeStart;
+        cutoff.volumeEnd = volumeEnd;
+        cutoff.sampleDuration = duration * AUDIO_SAMPLE_RATE;
+        
+        cutoff.curveExponentGenerator.generate(duration, exponential,
+                                               (volumeStart < volumeEnd) ? true : false, AUDIO_SAMPLE_RATE);
+        cutoff.curveExponentGenerator.generateMappedCurve(volumeStart, volumeEnd);
+        cutoff.bVolumeChange = true;
+        
+    }
+    void removeSegment(int index)
+    {
+        if (segments.size() <= index)
+            return;
+        segments.erase(segments.begin()+index);
+        
+        bAudioChanged = true;
     }
     
     void setPanning(float panning, PanningType panningType)
     {
         this->panning = zelmSynthUtil::getPanning(panning, panningType);
         
-        bSoundAltered = true;
+        bAudioChanged = true;
     }
     
     void start()
     {
         segmentIndex = 0;
         bStart = true;
+    }
+    void stopCutoff()
+    {
+        bCutoff = true;
+    }
+    void stop()
+    {
+        bStart = false;
     }
     void processAudio(ofSoundBuffer &in, ofSoundBuffer &out)
     {
@@ -579,7 +789,7 @@ public:
         
         for (int i = 0; i < numFrames; i++, currentSampleCount++)
         {
-            if (!bSoundAltered && bSoundSamplePeriodFinished)
+            if (!bAudioChanged && bSoundSamplePeriodFinished)
             {
                 out[i*numChannels] = audioPeriod[audioPeriodCount];
                 out[i*numChannels+1] = audioPeriod[audioPeriodCount+1];
@@ -593,10 +803,10 @@ public:
                 {
                     bSoundSamplePeriodFinished = false;
                 }
-                if (bSoundAltered)
+                if (bAudioChanged)
                 {
                     audioPeriod.clear();
-                    bSoundAltered = false;
+                    bAudioChanged = false;
                 }
                 switch(state)
                 {
@@ -604,7 +814,7 @@ public:
                         segments[segmentIndex].curveIndex = 0;
                         if (!segments[segmentIndex].bVolumeChange)
                         {
-                            volume = segments[segmentIndex].endVolume;
+                            volume = segments[segmentIndex].volumeEnd;
                             state = 2;
                         } else
                         {
@@ -625,21 +835,27 @@ public:
                     case 2:
                         if (segments[segmentIndex].sampleDuration <= currentSampleCount)
                         {
-                            state = 2;
+                            state = 3;
                         }
                         break;
                     case 3:
-                        volume = segments[segmentIndex].endVolume;
+                        volume = segments[segmentIndex].volumeEnd;
                         currentSampleCount = -1;
                         if (++segmentIndex == segments.size())
                         {
                             //segmentIndex = 0;
                             audioPeriodCount = 0;
-                            //bSoundAltered = false;
+                            //bAudioChanged = false;
                             bSoundSamplePeriodFinished = true;
                         }
                         state = 0;
                         break;
+                    case 4:
+                    {
+                        //TODO: work out cutoff
+                        break;
+                    }
+                        
                 }
                 
                 switch (waveType)
@@ -676,7 +892,7 @@ public:
                     }
                     case TriangleWave:
                     {
-                        triangleValue = (phase * twoDividePI);
+                        triangleValue = (phase * TWO_DIVIDE_PI);
                         if (phase < 0)
                         {
                             triangleValue = 1.0 + triangleValue;
@@ -699,16 +915,24 @@ public:
         }
     }
     
-    /*float attackTime;
-     float attackStartVolume;
-     float decayTime;
-     float decayEndVolume;
-     float peakVolume;*/
-    
+    void getInUse()
+    {
+        return bInUse;
+    }
 private:
-    bool bSoundAltered = false;
+    //New values for MidiController
+    bool bInUse = false;
+    bool bCutoff = false;
+    
+    Segment cutoff;
+    //End of new values
+    
+    
+    bool bAudioChanged = false;
     bool bSoundSamplePeriodFinished = false;
     //bool bPlayingFromSavedTable = false;
+    
+    int sampleRate;
     
     int audioPeriodCount;
     vector<float> audioPeriod;
@@ -735,7 +959,6 @@ private:
      float wavetableValue1;
      float wavetableValue2;*/
     
-    float twoDividePI;
     float triangleValue;
     //float wavetableIncrement;
     
@@ -743,6 +966,7 @@ private:
     
     
 };
+
 
 class OscillatedWavetable : public SoundObject
 {
@@ -764,18 +988,252 @@ public:
             //cout << zelmSynthUtil::getOscillatedWavetableValue(zelmSynthUtil::getOscillatedWavetableIndex(frequency), 4, sampleIndex) << "\n";
             out[i*numChannels] = zelmSynthUtil::getOscillatedWavetableValue(zelmSynthUtil::getOscillatedWavetableIndex(frequency), numOsc, sampleIndex) * 1.0 * panning.left;
             out[i*numChannels+1] = zelmSynthUtil::getOscillatedWavetableValue(zelmSynthUtil::getOscillatedWavetableIndex(frequency), numOsc, sampleIndex) * 1.0 * panning.right;
-            if (++sampleIndex == (WAVETABLE_SIZE))
+            if (++sampleIndex == (WAVETABLE_OSCILLATED_SIZE))
             {
                 sampleIndex = 0;
             }
         }
+        if (!bGotSoundBuffer)
+        {
+            drawBuffer = out;
+            bGotSoundBuffer = true;
+        }
+    }
+    void draw()
+    {
+        //if (buffer.size() >0) {
+        int x = 0;
+        int y = 0;
+            vector<ofMesh>meshes;
+            int chans = drawBuffer.getNumChannels();
+            for (int i = 0; i < chans; i++) {
+                meshes.push_back(ofMesh());
+                meshes.back().setMode(OF_PRIMITIVE_LINE_STRIP);
+            }
+            
+            float h = ofGetWindowHeight() / float(chans);
+            //float h2 = h * 0.5f;
+            //            float factor= this->width / buffer.getNumFrames();
+            
+            float xInc = ofGetWindowWidth()/(float)(drawBuffer.getNumFrames() -1);
+            ofVec3f v;
+            v.x = x;
+            for(int i=0; i<drawBuffer.getNumFrames(); i++){
+                
+                //v.x = ofMap(i, 0, buffer.getNumFrames() -1 , x, getMaxX());
+                for (int j = 0; j < chans; j++) {
+                    v.y = ofMap(drawBuffer[i*chans + j], -1, 1, h*(j+1) + y, h*j + y );
+                    //     meshes[j].addColor(ofFloatColor::pink);
+                    meshes[j].addVertex(v);
+                    if (ofGetMouseX() == (int)v.x)
+                    {
+                        cout << i*chans + j << "\n";
+                    }
+                }
+                v.x += xInc;
+            }
+            for (int i = 0; i < chans; i++) {
+                meshes[i].draw();
+            }
+        //}
     }
 private:
     int sampleIndex = 0;
     int numOsc;
     float frequency;
     Panning panning;
+    
+    ofSoundBuffer drawBuffer;
+    
+    bool bGotSoundBuffer;
 };
+
+class FrequencyModulation : public SoundObject
+{
+public:
+    void setup(float carrierFrequency, float modulatorFrequencyMultiplier, float volume = 1.0, float phase = 0)
+    {
+        this->carrierFrequency = carrierFrequency;
+        this->modulatorFrequency = carrierFrequency*modulatorFrequencyMultiplier;
+        this->volume = volume;
+        //this->phase = phase;
+        modulatorPhase = 0;
+        carrierPhase = 0;
+        
+    }
+    
+    void processAudio(ofSoundBuffer &in, ofSoundBuffer &out)
+    {
+        float frequencyRadian = TWO_PI / in.getSampleRate();
+        modulatorIncrement = frequencyRadian * modulatorFrequency;
+        modulatorAmplitude = 100;
+        int numFrames = out.getNumFrames();
+        int numChannels = out.getNumChannels();
+        for (int i = 0; i < numFrames; i++)
+        {
+            for (int c = 0; c < numChannels; c++)
+            {
+                out[i*numChannels +c] = sin(carrierPhase) * volume;
+            }
+            modulatorValue = modulatorAmplitude * sin(modulatorPhase);
+            carrierIncrement = frequencyRadian * (carrierFrequency + modulatorValue);
+            if ((carrierPhase += carrierIncrement) >= TWO_PI)
+                carrierPhase -= TWO_PI;
+            
+            if((modulatorPhase += modulatorIncrement) >= TWO_PI)
+                modulatorPhase -= TWO_PI;
+        }
+    }
+    //float frequency;
+    float modulatorFrequency;
+    float volume;
+private:
+    float currentPhase;
+    float modulatorValue;
+    float modulatorIncrement;
+    float modulatorPhase;
+    float modulatorAmplitude;
+    float carrierPhase;
+    float carrierIncrement;
+    float carrierFrequency;
+};
+class AmplitudeModulation : public SoundObject
+{
+public:
+    void setup(float carrierFrequency, float modulatorFrequencyMultiplier, float modulatorAmplitude,
+               float volume = 1.0, float phase = 0)
+    {
+        this->carrierFrequency = carrierFrequency;
+        this->modulatorFrequency = carrierFrequency*modulatorFrequencyMultiplier;
+        this->modulatorAmplitude = modulatorAmplitude;
+        this->volume = volume;
+        //this->phase = phase;
+        modulatorPhase = 0;
+        carrierPhase = 0;
+        
+    }
+    
+    void processAudio(ofSoundBuffer &in, ofSoundBuffer &out)
+    {
+        float frequencyRadian = TWO_PI / in.getSampleRate();
+        carrierIncrement = frequencyRadian * modulatorValue;
+        modulatorIncrement = frequencyRadian * modulatorFrequency;
+        modulatorScale = 1.0 / (1.0 + modulatorAmplitude);
+        int numFrames = out.getNumFrames();
+        int numChannels = out.getNumChannels();
+        for (int i = 0; i < numFrames; i++)
+        {
+            modulatorValue = 1.0 + (modulatorAmplitude * sin(modulatorPhase));
+            carrierValue = volume * sin(carrierPhase);
+            for (int c = 0; c < numChannels; c++)
+            {
+                out[i*numChannels +c] = carrierValue * modulatorValue * modulatorScale;
+            }
+            if ((carrierPhase += carrierIncrement) >= TWO_PI)
+                carrierPhase -= TWO_PI;
+            
+            if((modulatorPhase += modulatorIncrement) >= TWO_PI)
+                modulatorPhase -= TWO_PI;
+        }
+    }
+    //float frequency;
+    float modulatorFrequency;
+    float volume;
+private:
+    float currentPhase;
+    float modulatorValue;
+    float modulatorIncrement;
+    float modulatorPhase;
+    float modulatorAmplitude;
+    float modulatorScale;
+    float carrierPhase;
+    float carrierIncrement;
+    float carrierFrequency;
+    float carrierValue;
+};
+class RingAmplitudeModulation : public SoundObject
+{
+public:
+    void setup(float carrierFrequency, float modulatorFrequencyMultiplier, float modulatorAmplitude,
+               float volume = 1.0, float phase = 0)
+    {
+        this->carrierFrequency = carrierFrequency;
+        this->modulatorFrequency = carrierFrequency*modulatorFrequencyMultiplier;
+        this->modulatorAmplitude = modulatorAmplitude;
+        this->volume = volume;
+        //this->phase = phase;
+        modulatorPhase = 0;
+        carrierPhase = 0;
+        
+    }
+    
+    void processAudio(ofSoundBuffer &in, ofSoundBuffer &out)
+    {
+        float frequencyRadian = TWO_PI / in.getSampleRate();
+        carrierIncrement = frequencyRadian * modulatorValue;
+        modulatorIncrement = frequencyRadian * modulatorFrequency;
+        modulatorScale = 1.0 / (1.0 + modulatorAmplitude);
+        int numFrames = out.getNumFrames();
+        int numChannels = out.getNumChannels();
+        for (int i = 0; i < numFrames; i++)
+        {
+            modulatorValue = modulatorAmplitude * sin(modulatorPhase);
+            carrierValue = volume * sin(carrierPhase);
+            for (int c = 0; c < numChannels; c++)
+            {
+                out[i*numChannels +c] = carrierValue * modulatorValue;
+            }
+            if ((carrierPhase += carrierIncrement) >= TWO_PI)
+                carrierPhase -= TWO_PI;
+            
+            if((modulatorPhase += modulatorIncrement) >= TWO_PI)
+                modulatorPhase -= TWO_PI;
+        }
+    }
+    //float frequency;
+    float modulatorFrequency;
+    float volume;
+private:
+    float currentPhase;
+    float modulatorValue;
+    float modulatorIncrement;
+    float modulatorPhase;
+    float modulatorAmplitude;
+    float modulatorScale;
+    float carrierPhase;
+    float carrierIncrement;
+    float carrierFrequency;
+    float carrierValue;
+};
+
+class NoiseGenerator : public SoundObject
+{
+public:
+    void setup(float volume = 1.0)
+    {
+        this->volume = volume;
+        
+    }
+    
+    void processAudio(ofSoundBuffer &in, ofSoundBuffer &out)
+    {
+        int numFrames = out.getNumFrames();
+        int numChannels = out.getNumChannels();
+        for (int i = 0; i < numFrames; i++)
+        {
+            float value  = ofRandom(-1.0, 1.0);
+            for (int c = 0; c < numChannels; c++)
+            {
+                out[i*numChannels +c] = value;
+            }
+        }
+    }
+    //float frequency;
+    float volume;
+private:
+};
+
+
 class ofApp : public ofBaseApp{
 
 	public:
@@ -795,14 +1253,18 @@ class ofApp : public ofBaseApp{
 		void dragEvent(ofDragInfo dragInfo);
 		void gotMessage(ofMessage msg);
 		
-        StoreUnalteredSoundInTable storeUnalteredSoundInTable;
-    StoreUnalteredSoundInTable storeUnalteredSoundInTable2;
-    StoreUnalteredSoundInTable storeUnalteredSoundInTable3;
-    StoreUnalteredSoundInTable storeUnalteredSoundInTable4;
-    StoreUnalteredSoundInTable storeUnalteredSoundInTable5;
-    AudioMixer audioMixer;
+        ToneGenerator3 storeUnalteredSoundInTable;
+    ToneGenerator3 storeUnalteredSoundInTable2;
+    ToneGenerator3 storeUnalteredSoundInTable3;
+    ToneGenerator3 storeUnalteredSoundInTable4;
+    ToneGenerator3 storeUnalteredSoundInTable5;
+    zelmAudioMixer audioMixer;
     
     OscillatedWavetable osciallatedWavetable;
+    FrequencyModulation frequencyModulation;
+    AmplitudeModulation amplitudeModulation;
+    RingAmplitudeModulation ringAmplitudeModulation;
+    NoiseGenerator noiseGenerator;
         ofSoundStream soundStream;
     
 };

@@ -6,11 +6,12 @@ PanningData zelmSynthUtil::panningSquared;
 PanningData zelmSynthUtil::panningSine;
 float zelmSynthUtil::wavetable[WAVETABLE_SIZE+1];
 float zelmSynthUtil::wavetableOscillated[MIDI_NOTE_NUMBER][WAVETABLE_OSCILLATED_MAX][WAVETABLE_OSCILLATED_SIZE];
-
+//ofBuffer zelmSynthUtil::wavetableOscillatedBuffer[MIDI_NOTE_NUMBER][WAVETABLE_OSCILLATED_MAX];
+//ofXml zelmSynthUtil::XML;
 //--------------------------------------------------------------
 void ofApp::setup(){
     zelmSynthUtil::init();
-    soundStream.setup(AUDIO_CHANNEL_NUMBER, 0, AUDIO_SAMPLE_RATE, AUDIO_BUFFER_SIZE, 1);
+    soundStream.setup(2, 0, AUDIO_SAMPLE_RATE, AUDIO_BUFFER_SIZE, 1);
     
     /*storeUnalteredSoundInTable.setup(392.00, SineWave, 44100);
     storeUnalteredSoundInTable.addSegment(2.0, 0.0, 1.0, 0.2);
@@ -43,14 +44,30 @@ void ofApp::setup(){
     audioMixer.addInput(&storeUnalteredSoundInTable4);
     audioMixer.addInput(&storeUnalteredSoundInTable5);*/
     
-    //audioMixer.startRecord();
+    //
     
-    osciallatedWavetable.setup(440.0, 1);
+    //osciallatedWavetable.setup(220.0, 2);
     //audioMixer.addInput(&osciallatedWavetable);
-    //audioMixer.setMasterVolume(1.0);
-    //audioMixer.setPanning(0.0, PanningLinear);
     
-    soundStream.setOutput(osciallatedWavetable);
+    
+    //frequencyModulation.setup(440.0, 4);
+    //audioMixer.addInput(&frequencyModulation);
+    
+    //amplitudeModulation.setup(440.0, 2.0, 2.0);
+    //audioMixer.addInput(&amplitudeModulation);
+    
+    //ringAmplitudeModulation.setup(440.0, 2.0, 0.75);
+    //audioMixer.addInput(&ringAmplitudeModulation);
+    
+    noiseGenerator.setup();
+    audioMixer.addInput(&noiseGenerator);
+    
+    
+    audioMixer.setMasterVolume(1.0);
+    audioMixer.setPanning(0.0, PanningLinear);
+    audioMixer.startRecord();
+    
+    soundStream.setOutput(audioMixer);
 }
 
 //--------------------------------------------------------------
@@ -60,7 +77,7 @@ void ofApp::update(){
 
 //--------------------------------------------------------------
 void ofApp::draw(){
-
+    osciallatedWavetable.draw();
 }
 
 //--------------------------------------------------------------
