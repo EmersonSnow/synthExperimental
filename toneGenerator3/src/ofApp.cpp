@@ -62,8 +62,8 @@ void ofApp::setup(){
     //noiseGenerator.setup();
     //audioMixer.addInput(&noiseGenerator);
     
-    //amplitudeModulatorWavetable.setup(440.0, 2.0, 2.0);
-    //audioMixer.addInput(&amplitudeModulatorWavetable);
+    amplitudeModulatorWavetable.setup(440.0, 2.0, 2.0);
+    audioMixer.addInput(&amplitudeModulatorWavetable);
     
     //frequencyModulatorRefactored.setup(440.0, 2.0);
     //audioMixer.addInput(&frequencyModulatorRefactored);
@@ -72,12 +72,13 @@ void ofApp::setup(){
     //audioMixer.addInput(&frequencyModulatorRefactoredWavetable);
     
     
-    float multiplier[4] = {2.0, 3.0, 4.0, 5.0};
+    /*float multiplier[4] = {2.0, 3.0, 4.0, 0.5};
     float amplitude[4] = {1.0, 0.8, 0.6, 0.4};
     oscillatedWavetableBook.setup(440.0, 4, multiplier, amplitude);
-    audioMixer.addInput(&oscillatedWavetableBook);
+    audioMixer.addInput(&oscillatedWavetableBook);*/
     
-    
+    //amplitudeModulatorWavetableExample.setup(220.0, 440.0, 100);
+    //audioMixer.addInput(&amplitudeModulatorWavetableExample);
     
     audioMixer.startRecord();
     audioMixer.setMasterVolume(1.0);
