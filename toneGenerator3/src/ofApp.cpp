@@ -4,8 +4,17 @@ float zelmSynthUtil::noteFrequencies[MIDI_NOTE_NUMBER];
 PanningData zelmSynthUtil::panningLinear;
 PanningData zelmSynthUtil::panningSquared;
 PanningData zelmSynthUtil::panningSine;
-float zelmSynthUtil::wavetableSin[WAVETABLE_SIZE+1];
-float zelmSynthUtil::wavetableOscillated[MIDI_NOTE_NUMBER][WAVETABLE_OSCILLATED_MAX][WAVETABLE_OSCILLATED_SIZE];
+float zelmSynthUtil::wavetableSine[WAVETABLE_SIZE];
+float zelmSynthUtil::wavetableSquare[WAVETABLE_SIZE];
+float zelmSynthUtil::wavetableSaw[WAVETABLE_SIZE];
+float zelmSynthUtil::wavetableTriangle[WAVETABLE_SIZE];
+float zelmSynthUtil::wavetablePulse[WAVETABLE_SIZE];
+float zelmSynthUtil::wavetableSawDirectCalc[WAVETABLE_SIZE];
+float zelmSynthUtil::wavetableTriangleDirectCalc[WAVETABLE_SIZE];
+float zelmSynthUtil::wavetableSquareDirectCalc[WAVETABLE_SIZE];
+float zelmSynthUtil::wavetableSawPositive[WAVETABLE_SIZE];
+float zelmSynthUtil::wavetableTrianglePositive[WAVETABLE_SIZE];
+//float zelmSynthUtil::wavetables[WAVETABLE_NUMBER];
 //--------------------------------------------------------------
 void ofApp::setup(){
     zelmSynthUtil::init();
