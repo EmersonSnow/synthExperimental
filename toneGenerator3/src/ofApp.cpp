@@ -1,23 +1,22 @@
 #include "ofApp.h"
 
-float zelmSynthUtil::noteFrequencies[MIDI_NOTE_NUMBER];
-PanningData zelmSynthUtil::panningLinear;
-PanningData zelmSynthUtil::panningSquared;
-PanningData zelmSynthUtil::panningSine;
-float zelmSynthUtil::wavetableSine[WAVETABLE_SIZE];
-float zelmSynthUtil::wavetableSquare[WAVETABLE_SIZE];
-float zelmSynthUtil::wavetableSaw[WAVETABLE_SIZE];
-float zelmSynthUtil::wavetableTriangle[WAVETABLE_SIZE];
-float zelmSynthUtil::wavetablePulse[WAVETABLE_SIZE];
-float zelmSynthUtil::wavetableSawDirectCalc[WAVETABLE_SIZE];
-float zelmSynthUtil::wavetableTriangleDirectCalc[WAVETABLE_SIZE];
-float zelmSynthUtil::wavetableSquareDirectCalc[WAVETABLE_SIZE];
-float zelmSynthUtil::wavetableSawPositive[WAVETABLE_SIZE];
-float zelmSynthUtil::wavetableTrianglePositive[WAVETABLE_SIZE];
-//float zelmSynthUtil::wavetables[WAVETABLE_NUMBER];
+float SynthUtil::noteFrequencies[MIDI_NOTE_NUMBER];
+PanningData SynthUtil::panningLinear;
+PanningData SynthUtil::panningSquared;
+PanningData SynthUtil::panningSine;
+float SynthUtil::wavetableSine[WAVETABLE_SIZE];
+float SynthUtil::wavetableSquare[WAVETABLE_SIZE];
+float SynthUtil::wavetableSaw[WAVETABLE_SIZE];
+float SynthUtil::wavetableTriangle[WAVETABLE_SIZE];
+float SynthUtil::wavetablePulse[WAVETABLE_SIZE];
+float SynthUtil::wavetableSawDirectCalc[WAVETABLE_SIZE];
+float SynthUtil::wavetableTriangleDirectCalc[WAVETABLE_SIZE];
+float SynthUtil::wavetableSquareDirectCalc[WAVETABLE_SIZE];
+float SynthUtil::wavetableSawPositive[WAVETABLE_SIZE];
+float SynthUtil::wavetableTrianglePositive[WAVETABLE_SIZE];
 //--------------------------------------------------------------
 void ofApp::setup(){
-    zelmSynthUtil::init();
+    SynthUtil::init();
     soundStream.setup(2, 0, AUDIO_SAMPLE_RATE, AUDIO_BUFFER_SIZE, 1);
     
     /*storeUnalteredSoundInTable.setup(392.00, SineWave, 44100);
@@ -69,8 +68,8 @@ void ofApp::setup(){
     //noiseGenerator.setup();
     //audioMixer.addInput(&noiseGenerator);
     
-    amplitudeModulatorWavetable.setup(440.0, 2.0, 2.0);
-    audioMixer.addInput(&amplitudeModulatorWavetable);
+    //amplitudeModulatorWavetable.setup(440.0, 2.0, 2.0);
+    //audioMixer.addInput(&amplitudeModulatorWavetable);
     
     //frequencyModulatorRefactored.setup(440.0, 2.0);
     //audioMixer.addInput(&frequencyModulatorRefactored);
@@ -86,6 +85,15 @@ void ofApp::setup(){
     
     //amplitudeModulatorWavetableExample.setup(220.0, 440.0, 100);
     //audioMixer.addInput(&amplitudeModulatorWavetableExample);
+    
+    envelopeManager.setup(440.0, Oscillator, SynthUtil::getPanning(0.5, PanningLinear));
+    float multiplier[4] = {2.0, 3.0, 4.0, 0.5};
+    float amplitude[4] = {1.0, 0.8, 0.6, 0.4};
+    envelopeManager.setOscillatorWavetable(4, multiplier, amplitude, false);
+    envelopeManager.addSegment(2.0, 0.0, 1.0, 0.2);
+    envelopeManager.addSegment(2.0, 1.0, 0.0, 0.2);
+    envelopeManager.start();
+    audioMixer.addInput(&envelopeManager);
     
     audioMixer.startRecord();
     audioMixer.setMasterVolume(1.0);
