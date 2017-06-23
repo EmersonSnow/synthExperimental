@@ -4,7 +4,7 @@ float zelmSynthUtil::noteFrequencies[MIDI_NOTE_NUMBER];
 PanningData zelmSynthUtil::panningLinear;
 PanningData zelmSynthUtil::panningSquared;
 PanningData zelmSynthUtil::panningSine;
-float zelmSynthUtil::wavetable[WAVETABLE_SIZE+1];
+float zelmSynthUtil::wavetableSin[WAVETABLE_SIZE+1];
 float zelmSynthUtil::wavetableOscillated[MIDI_NOTE_NUMBER][WAVETABLE_OSCILLATED_MAX][WAVETABLE_OSCILLATED_SIZE];
 //ofBuffer zelmSynthUtil::wavetableOscillatedBuffer[MIDI_NOTE_NUMBER][WAVETABLE_OSCILLATED_MAX];
 //ofXml zelmSynthUtil::XML;
@@ -53,20 +53,35 @@ void ofApp::setup(){
     //frequencyModulation.setup(440.0, 4);
     //audioMixer.addInput(&frequencyModulation);
     
-    //amplitudeModulation.setup(440.0, 2.0, 2.0);
-    //audioMixer.addInput(&amplitudeModulation);
+    //amplitudeModulator.setup(440.0, 2.0, 2.0);
+    //audioMixer.addInput(&amplitudeModulator);
     
     //ringAmplitudeModulation.setup(440.0, 2.0, 0.75);
     //audioMixer.addInput(&ringAmplitudeModulation);
     
-    noiseGenerator.setup();
-    audioMixer.addInput(&noiseGenerator);
+    //noiseGenerator.setup();
+    //audioMixer.addInput(&noiseGenerator);
+    
+    //amplitudeModulatorWavetable.setup(440.0, 2.0, 2.0);
+    //audioMixer.addInput(&amplitudeModulatorWavetable);
+    
+    //frequencyModulatorRefactored.setup(440.0, 2.0);
+    //audioMixer.addInput(&frequencyModulatorRefactored);
+    
+    //frequencyModulatorRefactoredWavetable.setup(440.0, 2.0, 1);
+    //audioMixer.addInput(&frequencyModulatorRefactoredWavetable);
     
     
-    audioMixer.setMasterVolume(1.0);
-    audioMixer.setPanning(0.0, PanningLinear);
+    float multiplier[4] = {2.0, 3.0, 4.0, 5.0};
+    float amplitude[4] = {1.0, 0.8, 0.6, 0.4};
+    oscillatedWavetableBook.setup(440.0, 4, multiplier, amplitude);
+    audioMixer.addInput(&oscillatedWavetableBook);
+    
+    
+    
     audioMixer.startRecord();
-    
+    audioMixer.setMasterVolume(1.0);
+    audioMixer.setPanning(0.5, PanningLinear);
     soundStream.setOutput(audioMixer);
 }
 

@@ -26,7 +26,9 @@ enum WaveType
     SineWave,
     SawtoothWave,
     TriangleWave,
-    SquareWave
+    SquareWave,
+    FrequencyModulation,
+    AmplitudeModulation
 };
 
 struct PanningData
@@ -47,7 +49,7 @@ public:
     {
         generateNoteFrequencies();
         generatePanning();
-        generateWavetable();
+        generateSinWavetable();
         //ofDirectory directory(ofToDataPath("oscillated_wavetable"));
         //if (directory.exists())
         //{
@@ -131,22 +133,29 @@ public:
             }
         }
     }
-    
-    static void generateWavetable()
+    //static void generateSinWavetable;
+    static void generateSinWavetable()
     {
         float phaseIncrement = TWO_PI / WAVETABLE_SIZE;
         float phase = 0;
         for (int i = 0; i < WAVETABLE_SIZE+1; i++)
         {
             //wavetables.push_back(*new vector<float>);
-            wavetable[i] = sin(phase);
+            wavetableSin[i] = sin(phase);
             phase += phaseIncrement;
         }
     }
     
-    static float getWavetableValue(int index)
+    static const float getFrequencyTableIndex()
     {
-        return wavetable[index];
+        return float(WAVETABLE_SIZE) / float(AUDIO_SAMPLE_RATE);
+    }
+    
+    static float getWavetableSinValue(int index)
+    {
+        //if (index > WAVETABLE_SIZE || index < 0)
+        //    return;
+        return wavetableSin[index];
     }
     
     static void generateOscillatedFrequencies()
@@ -203,7 +212,7 @@ public:
                     value = 0; //Ignore first value because it always 1
                     for (int p = 0; p < numPart; p++)
                     {
-                        value += wavetable[(int)index[p]] * partAmp[p];
+                        value += wavetableSin[(int)index[p]] * partAmp[p];
                         index[p] += indexIncrement[p];
                         if (index[p] >= WAVETABLE_SIZE)
                             index[p] -= WAVETABLE_SIZE;
@@ -308,6 +317,7 @@ public:
         //TODO: Checks
         return wavetableOscillated[midiNote][numOscillated][sampleIndex];
     }
+    
     /*static void generateSummedWavetables()
      {
      int numSummed = 2;
@@ -329,7 +339,7 @@ private:
     static PanningData panningSine;
     
     //static float wavetable[2][WAVETABLE_SIZE+1];
-    static float wavetable[WAVETABLE_SIZE+1];
+    static float wavetableSin[WAVETABLE_SIZE+1];
     static float wavetableOscillated[MIDI_NOTE_NUMBER][WAVETABLE_OSCILLATED_MAX][WAVETABLE_OSCILLATED_SIZE];
     //static ofBuffer wavetableOscillatedBuffer[MIDI_NOTE_NUMBER][WAVETABLE_OSCILLATED_MAX];
     //static ofXml XML;
@@ -865,14 +875,14 @@ public:
                         //Increased wavetable size by 4, to elimate this calcation;
                         /*wavetableIndexBase = floor(wavetableIndex);
                          wavetableIndexFract = wavetableIndex - wavetableIndexBase;
-                         wavetableValue1 = zelmSynthUtil::getWavetableValue(wavetableIndex);
-                         wavetableValue2 = zelmSynthUtil::getWavetableValue(wavetableIndex+1);
+                         wavetableValue1 = zelmSynthUtil::getWavetableSinValue(wavetableIndex);
+                         wavetableValue2 = zelmSynthUtil::getWavetableSinValue(wavetableIndex+1);
                          wavetableValue1 = wavetableValue1 + ((wavetableValue2 - wavetableValue1) * wavetableIndexFract);*/
                         //out[i*numChannels] = wavetableValue1 * volume * panning.left;
                         //out[i*numChannels+1] = wavetableValue1 * volume * panning.right;
                         //cout << panning.left << " " << panning.right << "\n";
-                        out[i*numChannels] = zelmSynthUtil::getWavetableValue(wavetableIndex) * volume * panning.left;
-                        out[i*numChannels+1] = zelmSynthUtil::getWavetableValue(wavetableIndex) * volume * panning.right;
+                        out[i*numChannels] = zelmSynthUtil::getWavetableSinValue(wavetableIndex) * volume * panning.left;
+                        out[i*numChannels+1] = zelmSynthUtil::getWavetableSinValue(wavetableIndex) * volume * panning.right;
                         if ((wavetableIndex += phaseIncrement) >= (WAVETABLE_SIZE))
                         {
                             wavetableIndex -= WAVETABLE_SIZE;
@@ -1047,8 +1057,163 @@ private:
     
     bool bGotSoundBuffer;
 };
+class OscillatedWavetableBook : public SoundObject
+{
+public:
+    void setup(float frequency, int numberPartials, float *partials, float *amplitude, int gibbs = 0, float volume = 1.0)
+    {
+        this->maxMultiplier = 1;
+        this->frequency = frequency;
+        this->numberPartials = numberPartials;
+        this->gibbs = gibbs;
+        
+        this->index = 0;
+        this->indexIncrement = zelmSynthUtil::getFrequencyTableIndex() * frequency;
+        
 
-class FrequencyModulation : public SoundObject
+        for (int i = 0; i < numberPartials; i++)
+        {
+            SumPart part;
+            part.index = 0;
+            part.increment = 0;
+            part.multiplier = partials[i];
+            part.amplitude = amplitude[i];
+            part.sigma = amplitude[i];
+            if (part.multiplier > maxMultiplier)
+                maxMultiplier = part.multiplier;
+            parts.push_back(part);
+        }
+        calcParts();;
+    }
+    
+    void calcParts()
+    {
+        float tableDivideTwo = (float) WAVETABLE_SIZE / 2.0;
+        scale = 0;
+        countPartials = 0;
+        float sigK = 0;
+        float sigN = 0;
+        float sigTL = 0;
+        if (gibbs)
+        {
+            sigK = PI / maxMultiplier;
+            sigTL = tableDivideTwo;
+        }
+        for (int i = 0; i < parts.size(); i++)
+        {
+            parts[i].increment = indexIncrement * parts[i].multiplier;
+            if (parts[i].increment < tableDivideTwo)
+            {
+                if (gibbs && (parts[i].multiplier > 0))
+                {
+                    sigN = sigK * parts[i].multiplier;
+                    parts[i].sigma = parts[i].amplitude * zelmSynthUtil::getWavetableSinValue(sigN*sigTL) / sigN;
+                } else
+                {
+                    parts[i].sigma = parts[i].amplitude;
+                }
+                scale += (float) fabs((double)parts[i].sigma);
+            } else
+            {
+                parts[i].sigma = 0;
+            }
+        }
+        
+    }
+    inline float IndexCheck(float index)
+    {
+        if (index >= WAVETABLE_SIZE)
+        {
+            do
+                index -= WAVETABLE_SIZE;
+            while (index >= WAVETABLE_SIZE);
+        }
+        else if (index < 0)
+        {
+            do
+                index += WAVETABLE_SIZE;
+            while (index < 0);
+        }
+        return index;
+    }
+    void processAudio(ofSoundBuffer &in, ofSoundBuffer &out)
+    {
+        int numFrames = out.getNumFrames();
+        int numChannels = out.getNumChannels();
+        float v = 0;
+        for (int i = 0; i < numFrames; i++)
+        {
+            v = 0;
+            for (int p = 0; p < parts.size(); p++)
+            {
+                /*if (parts[p].index >= WAVETABLE_SIZE)
+                {
+                    while (parts[p].index >= WAVETABLE_SIZE)
+                    {
+                        parts[p].index -= WAVETABLE_SIZE;
+                    }
+                } else if (parts[p].index < 0)
+                {
+                    while (parts[p].index < 0)
+                    {
+                        parts[p].index += WAVETABLE_SIZE;
+                    }
+                }*/
+                parts[p].index = IndexCheck(parts[p].index);
+                v += zelmSynthUtil::getWavetableSinValue(parts[p].index);
+                parts[p].index += parts[p].increment;
+            }
+            v /= scale;
+            
+            index = IndexCheck(index);
+            /*if (index >= WAVETABLE_SIZE)
+            {
+                while (index >= WAVETABLE_SIZE)
+                {
+                    index -= WAVETABLE_SIZE;
+                }
+            } else if (index < 0)
+            {
+                while (index < 0)
+                {
+                    index += WAVETABLE_SIZE;
+                }
+            }*/
+            v += zelmSynthUtil::getWavetableSinValue((int)index);
+            index += indexIncrement;
+            
+            
+            for (int c = 0; c < numChannels; c++)
+            {
+                out[i*numChannels +c] = v * 1.0;
+            }
+            //cout << zelmSynthUtil::getOscillatedWavetableValue(zelmSynthUtil::getOscillatedWavetableIndex(frequency), 4, sampleIndex) << "\n";
+        }
+    }
+private:
+    int numberPartials;
+    int countPartials;
+    int gibbs;
+    float frequency;
+    float volume;
+    float index;
+    float indexIncrement;
+    float maxMultiplier;
+    float scale;
+    struct SumPart
+    {
+        float index;
+        float increment;
+        float multiplier;
+        float amplitude;
+        float sigma;
+    };
+    vector<SumPart> parts;
+    
+    
+    
+};
+class FrequencyModulator : public SoundObject
 {
 public:
     void setup(float carrierFrequency, float modulatorFrequencyMultiplier, float volume = 1.0, float phase = 0)
@@ -1097,7 +1262,114 @@ private:
     float carrierIncrement;
     float carrierFrequency;
 };
-class AmplitudeModulation : public SoundObject
+class FrequencyModulatorRefactored : public SoundObject
+{
+public:
+    void setup(float carrierFrequency, float modulatorFrequencyMultiplier, float volume = 1.0)
+    {
+        this->carrierFrequency = carrierFrequency;
+        this->modulatorFrequency = carrierFrequency*modulatorFrequencyMultiplier;
+        this->volume = volume;
+        
+        float frequencyRadian = (float)TWO_PI / (float)AUDIO_SAMPLE_RATE;
+        modulatorIncrement = frequencyRadian * modulatorFrequency;
+        modulatorAmplitude = frequencyRadian * 100;
+        modulatorPhase = 0;
+        
+        carrierIncrement = frequencyRadian * modulatorFrequency;
+        carrierPhase = 0;
+    }
+    
+    void processAudio(ofSoundBuffer &in, ofSoundBuffer &out)
+    {
+        int numFrames = out.getNumFrames();
+        int numChannels = out.getNumChannels();
+        for (int i = 0; i < numFrames; i++)
+        {
+            for (int c = 0; c < numChannels; c++)
+            {
+                out[i*numChannels +c] = sin(carrierPhase) * volume;
+            }
+            modulatorValue = modulatorAmplitude * sin(modulatorPhase);
+            carrierPhase += carrierIncrement + modulatorValue;
+            if (carrierPhase >= TWO_PI)
+                carrierPhase -= TWO_PI;
+            
+            if((modulatorPhase += modulatorIncrement) >= TWO_PI)
+                modulatorPhase -= TWO_PI;
+        }
+    }
+    //float frequency;
+    float modulatorFrequency;
+    float volume;
+private:
+    float currentPhase;
+    float modulatorValue;
+    float modulatorIncrement;
+    float modulatorPhase;
+    float modulatorAmplitude;
+    float carrierPhase;
+    float carrierIncrement;
+    float carrierFrequency;
+};
+class FrequencyModulatorRefactoredWavetable : public SoundObject
+{
+public:
+    void setup(float carrierFrequency, float modulatorFrequencyMultiplier, float modulatorIndexAmplitude, float volume = 1.0)
+    {
+        this->carrierFrequency = carrierFrequency;
+        this->modulatorFrequency = carrierFrequency*modulatorFrequencyMultiplier;
+        this->volume = volume;
+        this->indexOfModulator = modulatorIndexAmplitude;
+        float freTI = (float)WAVETABLE_SIZE / (float)AUDIO_SAMPLE_RATE;
+        modulatorIncrement = freTI * modulatorFrequency;
+        modulatorAmplitude = freTI * indexOfModulator * modulatorFrequency;
+        modulatorIndex = 0;
+        
+        carrierIncrement = freTI * carrierFrequency;
+        carrierIndex = 0;
+    }
+    
+    void processAudio(ofSoundBuffer &in, ofSoundBuffer &out)
+    {
+        int numFrames = out.getNumFrames();
+        int numChannels = out.getNumChannels();
+        for (int i = 0; i < numFrames; i++)
+        {
+            for (int c = 0; c < numChannels; c++)
+            {
+                out[i*numChannels +c] = zelmSynthUtil::getWavetableSinValue(carrierIndex) * volume;
+            }
+            modulatorValue = modulatorAmplitude * zelmSynthUtil::getWavetableSinValue(modulatorIndex);
+            
+            carrierIndex += carrierIncrement + modulatorValue;
+            if (carrierIndex >= WAVETABLE_SIZE)
+            {
+                carrierIndex -= WAVETABLE_SIZE;
+            } else if (carrierIndex < 0)
+            {
+                carrierIndex += WAVETABLE_SIZE;
+            }
+            
+            if((modulatorIndex += modulatorIncrement) >= WAVETABLE_SIZE)
+                modulatorIndex -= WAVETABLE_SIZE;
+        }
+    }
+    //float frequency;
+    float modulatorFrequency;
+    float volume;
+private:
+    float currentPhase;
+    float modulatorValue;
+    float modulatorIncrement;
+    float modulatorIndex;
+    float modulatorAmplitude;
+    float indexOfModulator;
+    float carrierIndex;
+    float carrierIncrement;
+    float carrierFrequency;
+};
+class AmplitudeModulator : public SoundObject
 {
 public:
     void setup(float carrierFrequency, float modulatorFrequencyMultiplier, float modulatorAmplitude,
@@ -1151,7 +1423,64 @@ private:
     float carrierFrequency;
     float carrierValue;
 };
-class RingAmplitudeModulation : public SoundObject
+//THIS WON'T WORK, WHY?
+class AmplitudeModulatorWavetable : public SoundObject
+{
+public:
+    void setup(float carrierFrequency, float modulatorFrequencyMultiplier, float modulatorAmplitude,
+               float volume = 1.0)
+    {
+        this->carrierFrequency = carrierFrequency;
+        this->modulatorFrequency = carrierFrequency*modulatorFrequencyMultiplier;
+        this->modulatorAmplitude = modulatorAmplitude;
+        this->volume = volume;
+        //this->phase = phase;
+        modulatorIndex = 0;
+        carrierIndex = 0;
+        float freTI = (float)WAVETABLE_SIZE / (float)AUDIO_SAMPLE_RATE;
+        carrierIncrement = freTI * carrierFrequency;
+        modulatorIncrement = freTI * modulatorFrequency;
+        
+        modulatorScale = 1.0 / (1.0 + modulatorAmplitude);
+        
+    }
+    
+    void processAudio(ofSoundBuffer &in, ofSoundBuffer &out)
+    {
+        int numFrames = out.getNumFrames();
+        int numChannels = out.getNumChannels();
+        for (int i = 0; i < numFrames; i++)
+        {
+            modulatorValue = 1.0 + (modulatorAmplitude * zelmSynthUtil::getWavetableSinValue(modulatorIndex));
+            carrierValue = volume * zelmSynthUtil::getWavetableSinValue(carrierIndex);
+            for (int c = 0; c < numChannels; c++)
+            {
+                out[i*numChannels +c] = carrierValue * modulatorValue * modulatorScale;
+            }
+            carrierIndex += carrierIncrement;
+            if(carrierIndex >= WAVETABLE_SIZE)
+                carrierIndex -= WAVETABLE_SIZE;
+            
+            modulatorIndex += modulatorIncrement;
+            if(modulatorIndex >= WAVETABLE_SIZE)
+                modulatorIndex -= WAVETABLE_SIZE;
+        }
+    }
+    //float frequency;
+    float modulatorFrequency;
+    float volume;
+private:
+    float modulatorValue;
+    float modulatorIncrement;
+    float modulatorIndex;
+    float modulatorAmplitude;
+    float modulatorScale;
+    float carrierIndex;
+    float carrierIncrement;
+    float carrierFrequency;
+    float carrierValue;
+};
+class RingAmplitudeModulator : public SoundObject
 {
 public:
     void setup(float carrierFrequency, float modulatorFrequencyMultiplier, float modulatorAmplitude,
@@ -1261,10 +1590,14 @@ class ofApp : public ofBaseApp{
     zelmAudioMixer audioMixer;
     
     OscillatedWavetable osciallatedWavetable;
-    FrequencyModulation frequencyModulation;
-    AmplitudeModulation amplitudeModulation;
-    RingAmplitudeModulation ringAmplitudeModulation;
+    FrequencyModulator frequencyModulator;
+    AmplitudeModulator amplitudeModulator;
+    RingAmplitudeModulator ringAmplitudeModulator;
     NoiseGenerator noiseGenerator;
+    AmplitudeModulatorWavetable amplitudeModulatorWavetable;
+    FrequencyModulatorRefactored frequencyModulatorRefactored;
+    FrequencyModulatorRefactoredWavetable frequencyModulatorRefactoredWavetable;
+    OscillatedWavetableBook oscillatedWavetableBook;
         ofSoundStream soundStream;
     
 };
