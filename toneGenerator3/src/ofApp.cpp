@@ -6,8 +6,6 @@ PanningData zelmSynthUtil::panningSquared;
 PanningData zelmSynthUtil::panningSine;
 float zelmSynthUtil::wavetableSin[WAVETABLE_SIZE+1];
 float zelmSynthUtil::wavetableOscillated[MIDI_NOTE_NUMBER][WAVETABLE_OSCILLATED_MAX][WAVETABLE_OSCILLATED_SIZE];
-//ofBuffer zelmSynthUtil::wavetableOscillatedBuffer[MIDI_NOTE_NUMBER][WAVETABLE_OSCILLATED_MAX];
-//ofXml zelmSynthUtil::XML;
 //--------------------------------------------------------------
 void ofApp::setup(){
     zelmSynthUtil::init();
@@ -93,7 +91,6 @@ void ofApp::update(){
 
 //--------------------------------------------------------------
 void ofApp::draw(){
-    osciallatedWavetable.draw();
 }
 
 //--------------------------------------------------------------
