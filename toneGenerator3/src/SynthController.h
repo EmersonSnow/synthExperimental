@@ -41,9 +41,10 @@ public:
     {
         for (int i = 0; i < WAVE_MANAGER_NUMBER; i++)
         {
+            WaveManager temp;
+            temp.setup(waveType, SynthUtil::getPanning(0.5, PanningLinear));
             waveManagers.push_back(*new WaveManager());
             int index = waveManagers.size()-1;
-            waveManagers[index].setup(waveType, SynthUtil::getPanning(0.5, PanningLinear));
             audioMixer.addInput(&waveManagers[index]);
         }
         soundStream.setOutput(audioMixer);

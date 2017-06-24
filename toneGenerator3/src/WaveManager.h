@@ -559,6 +559,7 @@ public:
         volume = 1.0;
 
         triangleValue = 0.0;
+        cout << "Called the initialiser \n";
     }
     
     void setup(WaveType waveType, Panning panning)
