@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "ofMain.h"
 
 #define TWO_DIVIDE_PI 2.0/PI
 
@@ -68,6 +69,20 @@ struct Panning
 {
     float left;
     float right;
+};
+
+struct OscillatorData
+{
+    int numberPartials;
+    vector<float> partials;
+    vector<float> amplitude;
+    bool gibbs;
+};
+
+struct ModulationData
+{
+    float modulationMultiplier;
+    float modulationAmplitude;
 };
 
 class SynthUtil
@@ -354,3 +369,5 @@ private:
     static float wavetableSawPositive[WAVETABLE_SIZE];
     static float wavetableTrianglePositive[WAVETABLE_SIZE];
 };
+
+

@@ -1,12 +1,14 @@
 #pragma once
 
 #include "ofMain.h"
-#include "SynthDefinition.h"
-#include "SynthAudio.h"
-#include "WavetableGenerators.h"
-#include "EnvelopeGenerator.h"
+#include "Includes.h"
+//#include "Extern.h"
+//#include "SynthDefinition.h"
+//#include "SynthAudio.h"
+//#include "SynthController.h"
+//#include "WavetableGenerators.h"
+//#include "EnvelopeGenerator.h"
 #include "ofxXmlSettings.h"
-
 
 
 
@@ -26,10 +28,10 @@
 
 //Old classes
 
-class ToneGenerator3 : public SoundObject
+/*class ToneGenerator3 : public SoundObject
 {
 public:
-    void setup(/*float frequency,*/ WaveType waveType, int sampleRate)
+    void setup(float frequency, WaveType waveType, int sampleRate)
     {
         this->frequency = 440.0; //Set 440.0 by as a placeholder
         this->waveType = waveType;
@@ -289,11 +291,11 @@ public:
                     case SineWave:
                     {
                         //Increased wavetable size by 4, to elimate this calcation;
-                        /*wavetableIndexBase = floor(wavetableIndex);
-                         wavetableIndexFract = wavetableIndex - wavetableIndexBase;
-                         wavetableValue1 = SynthUtil::getWavetableValue(WAVETABLE_SINE, wavetableIndex);
-                         wavetableValue2 = SynthUtil::getWavetableValue(WAVETABLE_SINE, wavetableIndex+1);
-                         wavetableValue1 = wavetableValue1 + ((wavetableValue2 - wavetableValue1) * wavetableIndexFract);*/
+                        //wavetableIndexBase = floor(wavetableIndex);
+                        //wavetableIndexFract = wavetableIndex - wavetableIndexBase;
+                        //wavetableValue1 = SynthUtil::getWavetableValue(WAVETABLE_SINE, wavetableIndex);
+                        //wavetableValue2 = SynthUtil::getWavetableValue(WAVETABLE_SINE, wavetableIndex+1);
+                        //wavetableValue1 = wavetableValue1 + ((wavetableValue2 - wavetableValue1) * wavetableIndexFract);
                         //out[i*numChannels] = wavetableValue1 * volume * panning.left;
                         //out[i*numChannels+1] = wavetableValue1 * volume * panning.right;
                         //cout << panning.left << " " << panning.right << "\n";
@@ -383,7 +385,7 @@ private:
     /*int wavetableIndexBase;
      float wavetableIndexFract;
      float wavetableValue1;
-     float wavetableValue2;*/
+     float wavetableValue2;
     
     float triangleValue;
     //float wavetableIncrement;
@@ -482,19 +484,19 @@ public:
             v = 0;
             for (int p = 0; p < parts.size(); p++)
             {
-                /*if (parts[p].index >= WAVETABLE_SIZE)
-                {
-                    while (parts[p].index >= WAVETABLE_SIZE)
-                    {
-                        parts[p].index -= WAVETABLE_SIZE;
-                    }
-                } else if (parts[p].index < 0)
-                {
-                    while (parts[p].index < 0)
-                    {
-                        parts[p].index += WAVETABLE_SIZE;
-                    }
-                }*/
+                //if (parts[p].index >= WAVETABLE_SIZE)
+                //{
+                //    while (parts[p].index >= WAVETABLE_SIZE)
+                //    {
+                //        parts[p].index -= WAVETABLE_SIZE;
+                //    }
+                //} else if (parts[p].index < 0)
+                //{
+                //    while (parts[p].index < 0)
+                //    {
+                //        parts[p].index += WAVETABLE_SIZE;
+                //    }
+                //}
                 parts[p].index = IndexCheck(parts[p].index);
                 v += SynthUtil::getWavetableValue(WAVETABLE_SINE, parts[p].index);
                 parts[p].index += parts[p].increment;
@@ -502,7 +504,7 @@ public:
             v /= scale;
             
             index = IndexCheck(index);
-            /*if (index >= WAVETABLE_SIZE)
+            if (index >= WAVETABLE_SIZE)
             {
                 while (index >= WAVETABLE_SIZE)
                 {
@@ -514,7 +516,7 @@ public:
                 {
                     index += WAVETABLE_SIZE;
                 }
-            }*/
+            }
             v += SynthUtil::getWavetableValue(WAVETABLE_SINE, index);
             index += indexIncrement;
             
@@ -960,7 +962,7 @@ public:
     float volume;
 private:
 };
-
+*/
 
 class ofApp : public ofBaseApp{
 
@@ -981,12 +983,12 @@ class ofApp : public ofBaseApp{
 		void dragEvent(ofDragInfo dragInfo);
 		void gotMessage(ofMessage msg);
 		
-        ToneGenerator3 storeUnalteredSoundInTable;
+        /*ToneGenerator3 storeUnalteredSoundInTable;
     ToneGenerator3 storeUnalteredSoundInTable2;
     ToneGenerator3 storeUnalteredSoundInTable3;
     ToneGenerator3 storeUnalteredSoundInTable4;
     ToneGenerator3 storeUnalteredSoundInTable5;
-    AudioMixer audioMixer;
+    
     
     //FrequencyModulation frequencyModulation;
     //AmplitudeModulation amplitudeModulation;
@@ -997,8 +999,12 @@ class ofApp : public ofBaseApp{
     FrequencyModulationRefactoredWavetable frequencyModulationRefactoredWavetable;
     OscillatedWavetableBook oscillatedWavetableBook;
     AmplitudeModulationWavetableExample
-    amplitudeModulationWavetableExample;
-    EnvelopeManager envelopeManager;
-        ofSoundStream soundStream;
+    amplitudeModulationWavetableExample;*/
+    //EnvelopeManagerRewrite envelopeManager;
+    
+    //AudioMixer audioMixer;
+    
+    
+    ofSoundStream soundStream;
     
 };

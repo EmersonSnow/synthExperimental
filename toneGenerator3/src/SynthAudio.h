@@ -31,12 +31,68 @@ public:
         }
         //inputObject->audioOut(workingBuffer);
         processAudio(workingBuffer, out);
+    }
+    
+    
+    ofSoundBuffer workingBuffer;
+    SoundObject *inputObject;
+};
+
+class AudioMixer : public SoundObject
+{
+public:
+    void setup(float masterVolume, Panning panning)
+    {
+        this->masterVolume = masterVolume;
+        this->panning = panning;
+    }
+    void addInput(SoundObject * soundObject)
+    {
+        mixerInputs.push_back(soundObject);
+    }
+    
+    void audioOut(ofSoundBuffer &out)
+    {
+        if (mixerInputs.size() > 0)
+        {
+            for (int i = 0; i < mixerInputs.size(); i++)
+            {
+                if (mixerInputs[i] != NULL)
+                {
+                    ofSoundBuffer temp;
+                    temp.resize(out.size());
+                    temp.setNumChannels(out.getNumChannels());
+                    temp.setSampleRate(out.getSampleRate());
+                    mixerInputs[i]->audioOut(temp);
+                    
+                    int left = 0;
+                    for (int right = 1; right < temp.size(); right+=2, left+=2)
+                    {
+                        out.getBuffer()[left] += temp.getBuffer()[left] * (1.0/mixerInputs.size()) * panning.left;
+                        out.getBuffer()[right] += temp.getBuffer()[right] * (1.0/mixerInputs.size()) * panning.right;
+                        /*if ((out.getBuffer()[b] > 1.0) || (out.getBuffer()[b] < -1.0))
+                         {
+                         cout << "Audio not noramlised " << out.getBuffer()[b] << "\n";
+                         }*/
+                    }
+                }
+            }
+        }
+        out *= masterVolume;
         
         if (bRecord)
             record(out);
     }
     
+    void setMasterVolume(float masterVolume)
+    {
+        this->masterVolume = masterVolume;
+    }
     
+    void setPanning(float panning, PanningType panningType)
+    {
+        this->panning = SynthUtil::getPanning(panning, panningType);
+    }
     
     virtual void record(ofSoundBuffer &out)
     {
@@ -109,72 +165,12 @@ public:
         file.close();
     }
     
-    
-    
-    bool bRecord = false;
-    vector<float> recordData;
-    ofSoundBuffer workingBuffer;
-    SoundObject *inputObject;
-    
-private:
-    
-    
-};
 
-class AudioMixer : public SoundObject
-{
-public:
-    
-    void addInput(SoundObject * soundObject)
-    {
-        mixerInputs.push_back(soundObject);
-    }
-    
-    void audioOut(ofSoundBuffer &out)
-    {
-        if (mixerInputs.size() > 0)
-        {
-            for (int i = 0; i < mixerInputs.size(); i++)
-            {
-                if (mixerInputs[i] != NULL)
-                {
-                    ofSoundBuffer temp;
-                    temp.resize(out.size());
-                    temp.setNumChannels(out.getNumChannels());
-                    temp.setSampleRate(out.getSampleRate());
-                    mixerInputs[i]->audioOut(temp);
-                    
-                    int left = 0;
-                    for (int right = 1; right < temp.size(); right+=2, left+=2)
-                    {
-                        out.getBuffer()[left] += temp.getBuffer()[left] * (1.0/mixerInputs.size()) * panning.left;
-                        out.getBuffer()[right] += temp.getBuffer()[right] * (1.0/mixerInputs.size()) * panning.right;
-                        /*if ((out.getBuffer()[b] > 1.0) || (out.getBuffer()[b] < -1.0))
-                         {
-                         cout << "Audio not noramlised " << out.getBuffer()[b] << "\n";
-                         }*/
-                    }
-                }
-            }
-        }
-        out *= masterVolume;
-        
-        if (bRecord)
-            record(out);
-    }
-    
-    void setMasterVolume(float masterVolume)
-    {
-        this->masterVolume = masterVolume;
-    }
-    
-    void setPanning(float panning, PanningType panningType)
-    {
-        this->panning = SynthUtil::getPanning(panning, panningType);
-    }
 private:
     float masterVolume = 1.0;
     vector<SoundObject*> mixerInputs;
     Panning panning;
+    bool bRecord = false;
+    vector<float> recordData;
     
 };

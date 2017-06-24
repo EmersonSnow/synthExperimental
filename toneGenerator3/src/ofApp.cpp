@@ -1,19 +1,5 @@
 #include "ofApp.h"
 
-float SynthUtil::noteFrequencies[MIDI_NOTE_NUMBER];
-PanningData SynthUtil::panningLinear;
-PanningData SynthUtil::panningSquared;
-PanningData SynthUtil::panningSine;
-float SynthUtil::wavetableSine[WAVETABLE_SIZE];
-float SynthUtil::wavetableSquare[WAVETABLE_SIZE];
-float SynthUtil::wavetableSaw[WAVETABLE_SIZE];
-float SynthUtil::wavetableTriangle[WAVETABLE_SIZE];
-float SynthUtil::wavetablePulse[WAVETABLE_SIZE];
-float SynthUtil::wavetableSawDirectCalc[WAVETABLE_SIZE];
-float SynthUtil::wavetableTriangleDirectCalc[WAVETABLE_SIZE];
-float SynthUtil::wavetableSquareDirectCalc[WAVETABLE_SIZE];
-float SynthUtil::wavetableSawPositive[WAVETABLE_SIZE];
-float SynthUtil::wavetableTrianglePositive[WAVETABLE_SIZE];
 //--------------------------------------------------------------
 void ofApp::setup(){
     SynthUtil::init();
@@ -86,7 +72,7 @@ void ofApp::setup(){
     //amplitudeModulatorWavetableExample.setup(220.0, 440.0, 100);
     //audioMixer.addInput(&amplitudeModulatorWavetableExample);
     
-    envelopeManager.setup(440.0, Oscillator, SynthUtil::getPanning(0.5, PanningLinear));
+    /*envelopeManager.setup(440.0, Oscillator, SynthUtil::getPanning(0.5, PanningLinear));
     float multiplier[4] = {2.0, 3.0, 4.0, 0.5};
     float amplitude[4] = {1.0, 0.8, 0.6, 0.4};
     envelopeManager.setOscillatorWavetable(4, multiplier, amplitude, false);
@@ -97,8 +83,10 @@ void ofApp::setup(){
     
     audioMixer.startRecord();
     audioMixer.setMasterVolume(1.0);
-    audioMixer.setPanning(0.5, PanningLinear);
-    soundStream.setOutput(audioMixer);
+    audioMixer.setPanning(0.5, PanningLinear);*/
+    
+    synthController.setWaveType(
+    //soundStream.setOutput(audioMixer);
 }
 
 //--------------------------------------------------------------
@@ -112,7 +100,7 @@ void ofApp::draw(){
 
 //--------------------------------------------------------------
 void ofApp::keyPressed(int key){
-    audioMixer.saveRecording("sound1.wav");
+    //audioMixer.saveRecording("sound1.wav");
 }
 
 //--------------------------------------------------------------

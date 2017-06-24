@@ -15,6 +15,7 @@ class WavetableBase
 public:
     void setupBase(float frequency, WaveType waveType, float index = 0)
     {
+        bInUse = false;
         setFrequency(frequency);
         setWaveType(waveType);
         reset(index);
@@ -23,6 +24,14 @@ public:
     {
         this->index = index;
         indexIncrement = frequency * SynthUtil::getFrequencyTableIndex();
+    }
+    inline bool setIsInUse(bool b)
+    {
+        bInUse = b;
+    }
+    inline bool getIsInUse()
+    {
+        return bInUse;
     }
     inline void setFrequency(float frequency)
     {
@@ -77,6 +86,7 @@ public:
         return SynthUtil::getWavetableValue(wavetableIndex, index);
     }
 protected:
+    bool bInUse;
     WaveType waveType;
     int wavetableIndex;
     float index;
@@ -314,8 +324,7 @@ public:
         modulationIndex = 0.0;
         modulationScale = 0.0;
     }
-    virtual void setup(float frequency, float modulationMultiplier, float modulationAmplitude,
-                       float index = 0.0)
+    virtual void setup(float frequency, float modulationMultiplier, float modulationAmplitude, float index = 0.0)
     {
         this->modulationFrequency = frequency * modulationMultiplier;
         this->modulationAmplitude = modulationAmplitude;
@@ -377,3 +386,258 @@ public:
         return value;
     }
 };
+
+//TODO: Set up a way so immediary after a wave switch, the sound carries on.
+class GeneratorContainer
+{
+public:
+    GeneratorContainer()
+    {
+        float partials[4] = {2.0, 3.0, 4.0, 5.0};
+        float amplitudes[4] = {0.80, .60, 0.40, 0.20};
+        setOscillatorData(4, partials, amplitudes, false);
+        setFrequencyModulationData(2.0, 10);
+        setAmplitudeModulationData(2.0, 0.75);
+        setRingModulationData(2.0, 0.75);
+    }
+    void setWaveType(WaveType waveType)
+    {
+        if (this->waveType == waveType)
+            return;
+        
+        this->waveType = waveType;
+        
+        /*wavetableInUse.clear();
+        switch(waveType)
+        {
+            case Oscillator:
+            {
+                for (int i = 0; i < oscillatorWavetables.size(); i++)
+                {
+                    oscillatorWavetables.setIsInUse(false);
+                }
+                return;
+            }
+            case FrequencyModulation:
+            {
+                for (int i = 0; i < frequencyModulationWavetables.size(); i++)
+                {
+                    //wavetableInUse.push_back(false);
+                }
+                return;
+            }
+            case AmplitudeModulation:
+            {
+                for (int i = 0; i < amplitudeModulationWavetables.size(); i++)
+                {
+                    //wavetableInUse.push_back(false);
+                }
+                return;
+            }
+            case RingModulation:
+            {
+                for (int i = 0; i < ringModulationWavetables.size(); i++)
+                {
+                    //wavetableInUse.push_back(false);
+                }
+                return;
+            }
+        }*/
+        //Maybe keep the already created classes, as they don't use much resources
+        //oscillatorWavetables.clear();
+        //frequencyModulationWavetables.clear();
+        //amplitudeModulationWavetables.clear();
+        //ringModulationWavetables.clear();
+    }
+    int getAvailableGenerator()
+    {
+        switch(waveType)
+        {
+            case Oscillator:
+            {
+                for (int i = 0; i < oscillatorWavetables.size(); i++)
+                {
+                    if (!oscillatorWavetables[i].getIsInUse())
+                    {
+                        return i;
+                    }
+                }
+                oscillatorWavetables.push_back(*new OscillatorWavetable);
+                int index = oscillatorWavetables.size()-1;
+                oscillatorWavetables[index].setIsInUse(true);
+                oscillatorWavetables[index].setup(440.0, oscillatorData.numberPartials, &oscillatorData.partials[0], &oscillatorData.amplitude[0], oscillatorData.gibbs);
+                return index;
+            }
+            case FrequencyModulation:
+            {
+                for (int i = 0; i < frequencyModulationWavetables.size(); i++)
+                {
+                    if (!frequencyModulationWavetables[i].getIsInUse())
+                    {
+                        return i;
+                    }
+                }
+                frequencyModulationWavetables.push_back(*new FrequencyModulationWavetable);
+                int index = frequencyModulationWavetables.size()-1;
+                frequencyModulationWavetables[index].setIsInUse(true);
+                frequencyModulationWavetables[index].setup(440.0, frequencyModulationData.modulationMultiplier, frequencyModulationData.modulationAmplitude);
+                return index;
+            }
+            case AmplitudeModulation:
+            {
+                for (int i = 0; i < amplitudeModulationWavetables.size(); i++)
+                {
+                    if (!amplitudeModulationWavetables[i].getIsInUse())
+                    {
+                        return i;
+                    }
+                }
+                amplitudeModulationWavetables.push_back(*new AmplitudeModulationWavetable);
+                int index = amplitudeModulationWavetables.size()-1;
+                amplitudeModulationWavetables[index].setIsInUse(true);
+                amplitudeModulationWavetables[index].setup(440.0, amplitudeModulationData.modulationMultiplier, amplitudeModulationData.modulationAmplitude);
+                return index;
+            }
+            case RingModulation:
+            {
+                for (int i = 0; i < ringModulationWavetables.size(); i++)
+                {
+                    if (!ringModulationWavetables[i].getIsInUse())
+                    {
+                        return i;
+                    }
+                }
+                ringModulationWavetables.push_back(*new RingModulationWavetable);
+                int index = ringModulationWavetables.size()-1;
+                ringModulationWavetables[index].setIsInUse(true);
+                ringModulationWavetables[index].setup(440.0, ringModulationData.modulationMultiplier, amplitudeModulationData.modulationAmplitude);
+                return index;
+
+            }
+        }
+    }
+    
+    OscillatorWavetable * getOscillatorGenerator(int index)
+    {
+        return &oscillatorWavetables[index];
+    }
+    FrequencyModulationWavetable * getFrequencyModulationGenerator(int index)
+    {
+        return &frequencyModulationWavetables[index];
+    }
+    AmplitudeModulationWavetable * getAmplitudeModulationGenerator(int index)
+    {
+        return &amplitudeModulationWavetables[index];
+    }
+    RingModulationWavetable * getRingModulationGenerator(int index)
+    {
+        return &ringModulationWavetables[index];
+    }
+    void setFreeGenerator(int index)
+    {
+        switch(waveType)
+        {
+            case Oscillator:
+            {
+                oscillatorWavetables[index].setIsInUse(false);
+                return;
+            }
+            case FrequencyModulation:
+            {
+                frequencyModulationWavetables[index].setIsInUse(false);
+                return;
+            }
+            case AmplitudeModulation:
+            {
+                amplitudeModulationWavetables[index].setIsInUse(false);
+                return;
+            }
+            case RingModulation:
+            {
+                ringModulationWavetables[index].setIsInUse(false);
+                return;
+            }
+        }
+    }
+    
+    void setOscillatorData(int numberPartials, float *partials, float *amplitude, bool gibbs)
+    {
+        //oscillatorWavetable.setup(frequency, numberPartials, partials, amplitude, gibbs);
+        oscillatorData.numberPartials = numberPartials;
+        oscillatorData.partials.clear();
+        oscillatorData.amplitude.clear();
+        for (int i = 0; i < numberPartials; i++)
+        {
+            oscillatorData.partials.push_back(partials[i]);
+            oscillatorData.amplitude.push_back(amplitude[i]);
+        }
+        oscillatorData.gibbs = gibbs;
+        
+        for (int i = 0; oscillatorWavetables.size(); i++)
+        {
+            oscillatorWavetables[i].setup(440.0, numberPartials, &oscillatorData.partials[0], &oscillatorData.amplitude[0], gibbs);
+        }
+    }
+    OscillatorData getOscillatorData()
+    {
+        return oscillatorData;
+    }
+    
+    void setFrequencyModulationData(float modulationMultiplier, float modulationIndexAmplitude)
+    {
+        frequencyModulationData.modulationMultiplier = modulationMultiplier;
+        frequencyModulationData.modulationAmplitude = modulationIndexAmplitude;
+        
+        for (int i = 0; i < frequencyModulationWavetables.size(); i++)
+        {
+            frequencyModulationWavetables[i].setup(440.0, modulationMultiplier, modulationIndexAmplitude);
+        }
+    }
+    ModulationData getFrequencyModulationData()
+    {
+        return frequencyModulationData;
+    }
+    
+    void setAmplitudeModulationData(float modulationMultiplier, float modulationAmplitude)
+    {
+        amplitudeModulationData.modulationMultiplier = modulationMultiplier;
+        amplitudeModulationData.modulationAmplitude;
+        for (int i = 0 ; amplitudeModulationWavetables.size(); i++)
+        {
+            amplitudeModulationWavetables[i].setup(440.0, modulationMultiplier, modulationAmplitude);
+        }
+    }
+    ModulationData getAmplitudeModulationData()
+    {
+        return amplitudeModulationData;
+    }
+    
+    void setRingModulationData(float modulationMultiplier, float modulationAmplitude)
+    {
+        ringModulationData.modulationMultiplier = modulationMultiplier;
+        ringModulationData.modulationAmplitude;
+        
+        for (int i = 0 ; ringModulationWavetables.size(); i++)
+        {
+            ringModulationWavetables[i].setup(440.0, modulationMultiplier, modulationAmplitude);
+        }
+    }
+    ModulationData getRIngModulationData()
+    {
+        return ringModulationData;
+    }
+    
+private:
+    WaveType waveType;
+    
+    OscillatorData oscillatorData;
+    ModulationData frequencyModulationData;
+    ModulationData amplitudeModulationData;
+    ModulationData ringModulationData;
+    
+    vector<OscillatorWavetable> oscillatorWavetables;
+    vector<FrequencyModulationWavetable> frequencyModulationWavetables;
+    vector<AmplitudeModulationWavetable> amplitudeModulationWavetables;
+    vector<RingModulationWavetable> ringModulationWavetables;
+};
+extern GeneratorContainer generatorContainer;
