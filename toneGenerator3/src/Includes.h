@@ -11,4 +11,4 @@
 #include "SynthDefinition.h"
 #include "SynthAudio.h"
 #include "SynthController.h"
-#include "WavetableGenerators.h"
+#include "SynthGenerators.h"

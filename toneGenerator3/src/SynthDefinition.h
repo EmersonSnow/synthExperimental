@@ -10,6 +10,7 @@
 
 #include "ofMain.h"
 
+#define ONE_DIVIDE_PI 1.0/PI
 #define TWO_DIVIDE_PI 2.0/PI
 
 
@@ -41,6 +42,8 @@
 #define AUDIO_SAMPLE_RATE 44100
 #define AUDIO_CHANNEL_NUMBER 2
 
+#define WAVE_MANAGER_NUMBER 10
+
 enum PanningType
 {
     PanningLinear,
@@ -50,10 +53,11 @@ enum PanningType
 enum WaveType
 {
     SineWave,
-    SawtoothWave,
+    SawWave,
     TriangleWave,
     SquareWave,
     Pulse,
+    Summed,
     Oscillator,
     FrequencyModulation,
     AmplitudeModulation,
@@ -85,6 +89,12 @@ struct ModulationData
     float modulationAmplitude;
 };
 
+struct SquareWaveData
+{
+    float dutyCycle;
+    float amplitudeMin;
+    float amplitudeMax;
+};
 class SynthUtil
 {
 public:
@@ -167,6 +177,10 @@ public:
                 return temp;
             }
         }
+    }
+    static const float getFrequencyRadian()
+    {
+        return TWO_PI / (float) AUDIO_SAMPLE_RATE;
     }
     //Typed copy from BasicSynth's WaveTable.h
     static void generateWavetables()
@@ -292,7 +306,7 @@ public:
             {
                 return WAVETABLE_SINE;
             }
-            case SawtoothWave:
+            case SawWave:
             {
                 return WAVETABLE_SAW;
             }
@@ -308,6 +322,10 @@ public:
             {
                 return WAVETABLE_PULSE;
             }
+            case Summed:
+            {
+                return WAVETABLE_SINE;
+            }
             case Oscillator:
             {
                 return WAVETABLE_SINE;
@@ -317,6 +335,10 @@ public:
                 return WAVETABLE_SINE;
             }
             case AmplitudeModulation:
+            {
+                return WAVETABLE_SINE;
+            }
+            case RingModulation:
             {
                 return WAVETABLE_SINE;
             }

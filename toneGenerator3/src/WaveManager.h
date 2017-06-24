@@ -96,7 +96,7 @@ public:
                 phaseIncrement = freTI * frequency;
                 break;
             }
-            case SawtoothWave:
+            case SawWave:
             {
                 phase = -1;
                 phaseIncrement = (2 * frequency) / (float)AUDIO_SAMPLE_RATE;
@@ -146,7 +146,7 @@ public:
                 phaseIncrement = freTI * frequency;
                 break;
             }
-            case SawtoothWave:
+            case SawWave:
             {
                 phase = -1;
                 phaseIncrement = (2 * frequency) / (float)AUDIO_SAMPLE_RATE;
@@ -195,7 +195,7 @@ public:
                 phaseIncrement = freTI * frequency;
                 break;
             }
-            case SawtoothWave:
+            case SawWave:
             {
                 phase = -1;
                 phaseIncrement = (2 * frequency) / AUDIO_SAMPLE_RATE;
@@ -425,7 +425,7 @@ public:
                         }
                         break;
                     }
-                    case SawtoothWave:
+                    case SawWave:
                     {
                         out[i*numChannels] = phase * volume * panning.left;
                         out[i*numChannels+1] = phase * volume * panning.right;
@@ -538,14 +538,35 @@ class WaveManager : public SoundObject
 public:
     WaveManager()
     {
+        bInUse = false;
+        bIsSetup = false;
+        //bGeneratorIsSetup = false;
+        bStart = false;
+        bCutoff = false;
+        bGotGenerator = false;
+        
+        waveGeneratorIndex = 0;
+        currentSampleCount = 0;
+        segmentIndex = 0;
+        wavetableIndex = 0;
+        state = 0;
+        
+        frequency = 440.0;
+        duration = 0.0;
+        phase = 0.0;
+        phaseIncrement = 0.0;
+        
+        volume = 1.0;
+
+        triangleValue = 0.0;
     }
+    
     void setup(WaveType waveType, Panning panning)
     {
-        this->frequency = 440.0;
-        this->waveType = waveType;
         this->panning = panning;
+        this->setWaveType(waveType);
         
-        switch(waveType)
+        /*switch(waveType)
         {
             case SineWave:
             {
@@ -554,7 +575,7 @@ public:
                 phaseIncrement = freTI * frequency;
                 break;
             }
-            case SawtoothWave:
+            case SawWave:
             {
                 phase = -1;
                 phaseIncrement = (2 * frequency) / (float)AUDIO_SAMPLE_RATE;
@@ -590,108 +611,32 @@ public:
             {
                 
             }
-        }
+        }*/
     }
     void setup(float frequency, WaveType waveType, Panning panning)
     {
-        this->frequency = frequency;
-        this->waveType = waveType;
+        this->setFrequency(frequency);
+        this->setWaveType(waveType);
         this->panning = panning;
-        
-        switch(waveType)
-        {
-            case SineWave:
-            {
-                phase = 0;
-                float freTI = WAVETABLE_SIZE / (float)AUDIO_SAMPLE_RATE;
-                phaseIncrement = freTI * frequency;
-                break;
-            }
-            case SawtoothWave:
-            {
-                phase = -1;
-                phaseIncrement = (2 * frequency) / (float)AUDIO_SAMPLE_RATE;
-                break;
-            }
-            case TriangleWave:
-            {
-                phase = 0;
-                phaseIncrement = (TWO_PI / (float)AUDIO_SAMPLE_RATE) * frequency;
-                break;
-            }
-            case SquareWave:
-            {
-                
-            }
-            case Pulse:
-            {
-                
-            }
-            case Oscillator:
-            {
-                //oscillatorWavetable = *new OscillatorWavetable();
-            }
-            case FrequencyModulation:
-            {
-                
-            }
-            case AmplitudeModulation:
-            {
-                
-            }
-        }
     }
     void setWaveType(WaveType waveType)
     {
         this->waveType = waveType;
-        switch(waveType)
+        if (bInUse)
         {
-            case SineWave:
-            {
-                //wavetableGenerator.generate(AUDIO_SAMPLE_RATE);
-                phase = 0;
-                float freTI = WAVETABLE_SIZE / (float)AUDIO_SAMPLE_RATE;
-                phaseIncrement = freTI * frequency;
-                break;
-            }
-            case SawtoothWave:
-            {
-                phase = -1;
-                phaseIncrement = (2 * frequency) / (float)AUDIO_SAMPLE_RATE;
-                break;
-            }
-            case TriangleWave:
-            {
-                phase = 0;
-                phaseIncrement = (TWO_PI / (float)AUDIO_SAMPLE_RATE) * frequency;
-                break;
-            }
-            case SquareWave:
-            {
-                
-            }
-            case Pulse:
-            {
-                
-            }
-            case Oscillator:
-            {
-                //oscillatorWavetable = *new OscillatorWavetable();
-            }
-            case FrequencyModulation:
-            {
-                
-            }
-            case AmplitudeModulation:
-            {
-                
-            }
+            getGenerator();
         }
+        
     }
     void setFrequency(float frequency)
     {
         this->frequency = frequency;
-        switch(waveType)
+        if (bGotGenerator)
+        {
+            waveGenerator->setFrequency(frequency);
+            waveGenerator->reset();
+        }
+        /*switch(waveType)
         {
             case SineWave:
             {
@@ -701,7 +646,7 @@ public:
                 phaseIncrement = freTI * frequency;
                 break;
             }
-            case SawtoothWave:
+            case SawWave:
             {
                 phase = -1;
                 phaseIncrement = (2 * frequency) / AUDIO_SAMPLE_RATE;
@@ -736,27 +681,217 @@ public:
             {
                 
             }
-        }
+        }*/
+    }
+    inline void setInUse(bool b)
+    {
+        bInUse = b;
+    }
+    inline bool getInUse()
+    {
+        return bInUse;
+    }
+    bool checkIsSetup()
+    {
+        if (segments.size() == 0)
+            return false;
+        
+        if (!bGotGenerator)
+            return false;
+        
+        if (!bFrequencyIsSet)
+            return false;
     }
     
+    void getGenerator()
+    {
+        switch(waveType)
+        {
+            case SineWave:
+            {
+                
+                break;
+            }
+            case SawWave:
+            {
+                waveGeneratorIndex = generatorContainer.getAvailableGenerator();
+                waveGenerator = generatorContainer.getSawWaveGenerator(waveGeneratorIndex);
+                break;
+            }
+            case TriangleWave:
+            {
+                waveGeneratorIndex = generatorContainer.getAvailableGenerator();
+                waveGenerator = generatorContainer.getTriangleWaveGenerator(waveGeneratorIndex);
+                break;
+            }
+            case SquareWave:
+            {
+                waveGeneratorIndex = generatorContainer.getAvailableGenerator();
+                waveGenerator = generatorContainer.getSquareWaveGenerator(waveGeneratorIndex);
+                break;
+            }
+            case Pulse:
+            {
+                break;
+            }
+            case Summed:
+            {
+                break;
+            }
+            case Oscillator:
+            {
+                waveGeneratorIndex = generatorContainer.getAvailableGenerator();
+                waveGenerator = generatorContainer.getOscillatorGenerator(waveGeneratorIndex);
+                break;
+            }
+            case FrequencyModulation:
+            {
+                waveGeneratorIndex = generatorContainer.getAvailableGenerator();
+                waveGenerator = generatorContainer.getFrequencyModulationGenerator(waveGeneratorIndex);
+                break;
+            }
+            case AmplitudeModulation:
+            {
+                waveGeneratorIndex = generatorContainer.getAvailableGenerator();
+                waveGenerator = generatorContainer.getAmplitudeModulationGenerator(waveGeneratorIndex);
+                break;
+            }
+            case RingModulation:
+            {
+                waveGeneratorIndex = generatorContainer.getAvailableGenerator();
+                waveGenerator = generatorContainer.getRingModulationGenerator(waveGeneratorIndex);
+                break;
+            }
+        }
+        if (bFrequencyIsSet)
+        {
+            waveGenerator->setFrequency(frequency);
+        }
+        waveGenerator->reset();
+        
+        bGotGenerator = true;
+    }
+    GeneratorBase * getGeneratorPointer()
+    {
+        switch(waveType)
+        {
+            case SineWave:
+            {
+                
+                break;
+            }
+            case SawWave:
+            {
+                return waveGenerator = generatorContainer.getSawWaveGenerator(waveGeneratorIndex);
+            }
+            case TriangleWave:
+            {
+                return generatorContainer.getTriangleWaveGenerator(waveGeneratorIndex);
+            }
+            case SquareWave:
+            {
+                return generatorContainer.getSquareWaveGenerator(waveGeneratorIndex);
+            }
+            case Pulse:
+            {
+                break;
+            }
+            case Summed:
+            {
+                break;
+            }
+            case Oscillator:
+            {
+                return generatorContainer.getOscillatorGenerator(waveGeneratorIndex);
+            }
+            case FrequencyModulation:
+            {
+                return generatorContainer.getFrequencyModulationGenerator(waveGeneratorIndex);
+            }
+            case AmplitudeModulation:
+            {
+                return generatorContainer.getAmplitudeModulationGenerator(waveGeneratorIndex);
+            }
+            case RingModulation:
+            {
+                return generatorContainer.getRingModulationGenerator(waveGeneratorIndex);
+            }
+        }
+    }
+    /*void setSawWave()
+    {
+        waveGeneratorIndex = generatorContainer.getAvailableGenerator();
+        waveGenerator = generatorContainer.getSawWaveGenerator(waveGeneratorIndex);
+        if (bFrequencyIsSet)
+        {
+            waveGenerator->setFrequency(frequency);
+        }
+        waveGenerator->reset();
+    }
+    void setTriangleWave()
+    {
+        waveGeneratorIndex = generatorContainer.getAvailableGenerator();
+        waveGenerator = generatorContainer.getTriangleWaveGenerator(waveGeneratorIndex);
+        if (bFrequencyIsSet)
+        {
+            waveGenerator->setFrequency(frequency);
+        }
+        waveGenerator->reset();
+    }
+    void setSquareWave()
+    {
+        waveGeneratorIndex = generatorContainer.getAvailableGenerator();
+        waveGenerator = generatorContainer.getSquareWaveGenerator(waveGeneratorIndex);
+        if (bFrequencyIsSet)
+        {
+            waveGenerator->setFrequency(frequency);
+        }
+        waveGenerator->reset();
+    }
     void setOscillator()
     {
         waveGeneratorIndex = generatorContainer.getAvailableGenerator();
-        oscillatorWavetable = generatorContainer.getOscillatorGenerator(waveGeneratorIndex);
+        waveGenerator = generatorContainer.getOscillatorGenerator(waveGeneratorIndex);
+        if (bFrequencyIsSet)
+        {
+            waveGenerator->setFrequency(frequency);
+        }
+        waveGenerator->reset();
     }
     void setFrequencyModulation()
     {
-        waveGeneratorIndex = generatorContainer.getAvailableGenerator();        frequencyModulationWavetable = generatorContainer.getFrequencyModulationGenerator(waveGeneratorIndex);
+        waveGeneratorIndex = generatorContainer.getAvailableGenerator();
+        waveGenerator = generatorContainer.getFrequencyModulationGenerator(waveGeneratorIndex);
+        if (bFrequencyIsSet)
+        {
+            waveGenerator->setFrequency(frequency);
+        }
+        waveGenerator->reset();
     }
     void setAmplitudeModulation()
     {
         waveGeneratorIndex = generatorContainer.getAvailableGenerator();
-        amplitudeModulationWavetable = generatorContainer.getAmplitudeModulationGenerator(waveGeneratorIndex);
+        waveGenerator = generatorContainer.getAmplitudeModulationGenerator(waveGeneratorIndex);
+        if (bFrequencyIsSet)
+        {
+            waveGenerator->setFrequency(frequency);
+        }
+        waveGenerator->reset();
     }
     void setRingModulation()
     {
         waveGeneratorIndex = generatorContainer.getAvailableGenerator();
-        ringModulationWavetable = generatorContainer.getRingModulationGenerator(waveGeneratorIndex);
+        waveGenerator = generatorContainer.getRingModulationGenerator(waveGeneratorIndex);
+        if (bFrequencyIsSet)
+        {
+            waveGenerator->setFrequency(frequency);
+        }
+        waveGenerator->reset();
+    }*/
+    void freeGenerator()
+    {
+        waveGenerator->setInUse(false);
+        bGotGenerator = false;
     }
     
     void addSegment(float duration, float volumeStart, float volumeEnd, float exponential, bool bSineWaveOscillator = false, int numberOscillator = 0)
@@ -777,10 +912,6 @@ public:
             temp.bVolumeChange = true;
         }
         segments.push_back(temp);
-    }
-    bool getInUse()
-    {
-        return bInUse;
     }
     void insertSegment(int position, float duration, float volumeStart, float volumeEnd, float exponential, bool bSineWaveOscillator = false, int numberOscillator = 0)
     {
@@ -851,6 +982,7 @@ public:
         if (!bStart)
             return;
         
+        cout << "Calling \n";
         int numFrames = out.getNumFrames();
         int numChannels = out.getNumChannels();
         
@@ -923,7 +1055,7 @@ public:
                     }
                     break;
                 }
-                case SawtoothWave:
+                case SawWave:
                 {
                     out[i*numChannels] = phase * volume * panning.left;
                     out[i*numChannels+1] = phase * volume * panning.right;
@@ -960,6 +1092,10 @@ public:
                 {
                         
                 }
+                case Summed:
+                {
+                    
+                }
                 case Oscillator:
                 {
                     //float value = oscillatorWavetable.generateSample();
@@ -984,20 +1120,23 @@ public:
     
     
 private:
-    //New values for MidiController
-    bool bInUse = false;
-    bool bCutoff = false;
+    bool bInUse;
+    
+    bool bCutoff;
+    bool bStart;
+    bool bIsSetup;
+    bool bFrequencyIsSet;
+    
+    int state;
     
     Segment cutoff;
-    
-    bool bStart = false;
     
     WaveType waveType;
     
     float volume;
     Panning panning;
     
-    int state;
+    
     
     int currentSampleCount;
     int segmentIndex;
@@ -1007,11 +1146,21 @@ private:
     float phase;
     float phaseIncrement;
     
+    
+    
+    bool bGotGenerator;
     int waveGeneratorIndex;
+    
+    //GeneratorBase & waveGenerator;
+    GeneratorBase * waveGenerator;
+    
+    /*SawWaveGenerator * sawWaveGenerator;
+    TriangleWaveGenerator * triangleWaveGenerator;
+    SquareWaveGenerator squareWaveGenerator;
     OscillatorWavetable * oscillatorWavetable;
     FrequencyModulationWavetable * frequencyModulationWavetable;
     AmplitudeModulationWavetable * amplitudeModulationWavetable;
-    RingModulationWavetable * ringModulationWavetable;
+    RingModulationWavetable * ringModulationWavetable;*/
     
     
     //WavetableGenerator wavetableGenerator;
@@ -1027,3 +1176,152 @@ private:
     vector<Segment> segments;
     
 };
+
+class AudioMixer : public SoundObject
+{
+public:
+    void setup(float masterVolume, Panning panning)
+    {
+        this->masterVolume = masterVolume;
+        this->panning = panning;
+    }
+    void addInput(WaveManager * waveManager)
+    {
+        mixerInputs.push_back(waveManager);
+    }
+    void removeInput(WaveManager * waveManager)
+    {
+        for (int i = 0; i < mixerInputs.size(); i++)
+        {
+            if (mixerInputs[i] == waveManager)
+            {
+                mixerInputs.erase(mixerInputs.begin()+i);
+                return;
+            }
+        }
+    }
+    void audioOut(ofSoundBuffer &out)
+    {
+        if (mixerInputs.size() > 0)
+        {
+            for (int i = 0; i < mixerInputs.size(); i++)
+            {
+                if (mixerInputs[i]->getInUse())
+                    cout << i << " Index, " << mixerInputs[i]->getInUse() << "\n";
+                if (mixerInputs[i] != NULL && mixerInputs[i]->getInUse())
+                {
+                    ofSoundBuffer temp;
+                    temp.resize(out.size());
+                    temp.setNumChannels(out.getNumChannels());
+                    temp.setSampleRate(out.getSampleRate());
+                    
+                    mixerInputs[i]->audioOut(temp);
+                    
+                    int left = 0;
+                    for (int right = 1; right < temp.size(); right+=2, left+=2)
+                    {
+                        out.getBuffer()[left] += temp.getBuffer()[left] * (1.0/mixerInputs.size()) * panning.left;
+                        out.getBuffer()[right] += temp.getBuffer()[right] * (1.0/mixerInputs.size()) * panning.right;
+                        /*if ((out.getBuffer()[b] > 1.0) || (out.getBuffer()[b] < -1.0))
+                         {
+                         cout << "Audio not noramlised " << out.getBuffer()[b] << "\n";
+                         }*/
+                    }
+                }
+            }
+        }
+        out *= masterVolume;
+        
+        if (bRecord)
+            record(out);
+    }
+    
+    void setMasterVolume(float masterVolume)
+    {
+        this->masterVolume = masterVolume;
+    }
+    
+    void setPanning(float panning, PanningType panningType)
+    {
+        this->panning = SynthUtil::getPanning(panning, panningType);
+    }
+    
+    virtual void record(ofSoundBuffer &out)
+    {
+        for (int i = 0; i < out.size(); i++)
+        {
+            recordData.push_back(out.getBuffer()[i]);
+        }
+    }
+    
+    void startRecord()
+    {
+        recordData = *new vector<float>;
+        bRecord = true;
+    }
+    
+    void saveRecording(string path)
+    {
+        ofFile f(path);
+        if(ofToLower(f.getExtension())!="wav") {
+            path += ".wav";
+            ofLogWarning() << "Can only write wav files - will save file as " << path;
+        }
+        
+        fstream file(ofToDataPath(path).c_str(), ios::out | ios::binary);
+        if(!file.is_open()) {
+            ofLogError() << "Error opening sound file '" << path << "' for writing";
+            return false;
+        }
+        
+        // write a wav header
+        short myFormat = 1; // for pcm
+        int mySubChunk1Size = 16;
+        int bitsPerSample = 16; // assume 16 bit pcm
+        int myByteRate = AUDIO_SAMPLE_RATE * 2 * bitsPerSample/8;
+        short myBlockAlign = 2 * bitsPerSample/8;
+        int myChunkSize = 36 + recordData.size()*bitsPerSample/8;
+        int myDataSize = recordData.size()*bitsPerSample/8;
+        cout << "myDataSize " << myDataSize << "\n";
+        int channels = 2;
+        int sampleRate = AUDIO_SAMPLE_RATE;
+        
+        file.seekp (0, ios::beg);
+        file.write ("RIFF", 4);
+        file.write ((char*) &myChunkSize, 4);
+        file.write ("WAVE", 4);
+        file.write ("fmt ", 4);
+        file.write ((char*) &mySubChunk1Size, 4);
+        file.write ((char*) &myFormat, 2); // should be 1 for PCM
+        file.write ((char*) &channels, 2); // # channels (1 or 2)
+        file.write ((char*) &sampleRate, 4); // 44100
+        file.write ((char*) &myByteRate, 4); //
+        file.write ((char*) &myBlockAlign, 2);
+        file.write ((char*) &bitsPerSample, 2); //16
+        file.write ("data", 4);
+        file.write ((char*) &myDataSize, 4);
+        
+        
+        
+        short writeBuff[FILE_WRITE_BUFFER_SIZE];
+        int pos = 0;
+        while(pos<recordData.size()) {
+            int len = MIN(FILE_WRITE_BUFFER_SIZE, recordData.size()-pos);
+            for(int i = 0; i < len; i++) {
+                writeBuff[i] = (int)(recordData[pos]*32767.f);
+                pos++;
+            }
+            file.write((char*)writeBuff, len*bitsPerSample/8);
+        }
+        
+        file.close();
+    }
+    
+private:
+    float masterVolume = 1.0;
+    Panning panning;
+    bool bRecord = false;
+    vector<float> recordData;
+    vector<WaveManager*> mixerInputs;
+};
+

@@ -1003,8 +1003,7 @@ class ofApp : public ofBaseApp{
     //EnvelopeManagerRewrite envelopeManager;
     
     //AudioMixer audioMixer;
-    
-    
-    ofSoundStream soundStream;
+    //ofSoundStream soundStream;
+    WaveManager * waveManager;
     
 };
