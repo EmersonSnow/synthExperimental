@@ -1205,24 +1205,24 @@ public:
     {
         if (mixerInputs.size() > 0)
         {
-            for (int i = 0; i < mixerInputs.size(); i++)
+            for (int i = 0; i < synthController.waveManager.size(); i++)
             {
-                if (mixerInputs[i]->getInUse())
+                if (synthController.waveManagers[i]getInUse())
                     cout << i << " Index, " << mixerInputs[i]->getInUse() << "\n";
-                if (mixerInputs[i] != NULL && mixerInputs[i]->getInUse())
+                if (synthController.waveManagers[i] != NULL && synthController.waveManagers[i].getInUse())
                 {
                     ofSoundBuffer temp;
                     temp.resize(out.size());
                     temp.setNumChannels(out.getNumChannels());
                     temp.setSampleRate(out.getSampleRate());
                     
-                    mixerInputs[i]->audioOut(temp);
+                    synthController.waveManagers[i].audioOut(temp);
                     
                     int left = 0;
                     for (int right = 1; right < temp.size(); right+=2, left+=2)
                     {
-                        out.getBuffer()[left] += temp.getBuffer()[left] * (1.0/mixerInputs.size()) * panning.left;
-                        out.getBuffer()[right] += temp.getBuffer()[right] * (1.0/mixerInputs.size()) * panning.right;
+                        out.getBuffer()[left] += temp.getBuffer()[left] * (1.0/synthController.waveManagers[i].size()) * panning.left;
+                        out.getBuffer()[right] += temp.getBuffer()[right] * (1.0/synthController.waveManagers[i].size()) * panning.right;
                         /*if ((out.getBuffer()[b] > 1.0) || (out.getBuffer()[b] < -1.0))
                          {
                          cout << "Audio not noramlised " << out.getBuffer()[b] << "\n";

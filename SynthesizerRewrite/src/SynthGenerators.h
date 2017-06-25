@@ -9,18 +9,20 @@
 #pragma once
 
 #include "SynthDefinition.h"
-class GeneratorBase
+
+class WaveGeneratorBase
 {
 public:
-    /*GeneratorBase()
+    WaveGeneratorBase()
     {
         bInUse = false;
         index = 0.0;
         indexIncrement = 0.0;
         frequency = 0.0;
-    }*/
-    virtual void setup(float phase = 0.0)
+    }
+    virtual void setup(float frequency, float phase = 0.0)
     {
+        setFrequency(frequency);
         reset(phase);
     }
     virtual void reset(float phase = 0.0)
@@ -87,12 +89,12 @@ protected:
     float indexIncrement;
     float frequency;
 };
-class SawWaveGenerator : public GeneratorBase
-{
+class SawWaveGenerator : public WaveGeneratorBase{
 public:
-    virtual void setup(bool newValue, float phase = 0.0)
+    virtual void setup(float frequency, float phase = 0)
     {
-        cout << "Called this SawWaveGenerator::setup() \n";
+        setFrequency(frequency);
+        reset(phase);
     }
     virtual void reset(float phase = 0)
     {
@@ -127,7 +129,7 @@ public:
         return value;
     }
 };
-class TriangleWaveGenerator : public GeneratorBase
+class TriangleWaveGenerator : public WaveGeneratorBase
 {
 public:
     virtual void modulate(float frequencyValue)
@@ -159,11 +161,12 @@ public:
         
     }
 };
-class SquareWaveGenerator : public GeneratorBase
+class SquareWaveGenerator : public WaveGeneratorBase
 {
 public:
     SquareWaveGenerator()
     {
+        WaveGeneratorBase::WaveGeneratorBase();
         midPoint = PI;
         dutyCycle = 50.0;
         amplitudeMax = 1.0;
@@ -188,7 +191,7 @@ public:
     }
     virtual void reset(float phase = 0)
     {
-        GeneratorBase::reset(phase);
+        WaveGeneratorBase::reset(phase);
         midPoint = TWO_PI * (dutyCycle / 100.0);
     }
     
@@ -206,9 +209,17 @@ private:
     float amplitudeMin;
 };
 //TODO: Add sinewave wavetable based generator, add summed, and looking into wavetables for squared, saw and triangle
-class WavetableBase : public GeneratorBase
+class WavetableBase
 {
 public:
+    WavetableBase()
+    {
+        bInUse = false;
+        index = 0.0;
+        indexIncrement = 0.0;
+        frequency = 0.0;
+        wavetableIndex = 0;
+    }
     void setupBase(float frequency, WaveType waveType, float index = 0)
     {
         bInUse = false;
@@ -216,10 +227,26 @@ public:
         setWaveType(waveType);
         reset(index);
     }
+    inline bool setInUse(bool b)
+    {
+        bInUse = b;
+    }
+    inline bool getInUse()
+    {
+        return bInUse;
+    }
     virtual void reset(float index = 0)
     {
         this->index = index;
         indexIncrement = frequency * SynthUtil::getFrequencyTableIndex();
+    }
+    inline void setFrequency(float frequency)
+    {
+        this->frequency = frequency;
+    }
+    inline float getFrequency()
+    {
+        return frequency;
     }
     virtual void modulate(float frequencyValue)
     {
@@ -242,7 +269,7 @@ public:
     {
         return waveType;
     }
-    inline float IndexWrapWavetable(float index)
+    inline float indexWrapWavetable(float index)
     {
         if (index >= WAVETABLE_SIZE)
         {
@@ -262,11 +289,16 @@ public:
     virtual float generateSample()
     {
         index += indexIncrement;
-        index = IndexWrapWavetable(index);
+        index = indexWrapWavetable(index);
         return SynthUtil::getWavetableValue(wavetableIndex, index);
     }
 protected:
+    bool bInUse;
     int wavetableIndex;
+    float index;
+    float indexIncrement;
+    float frequency;
+    WaveType waveType;
 };
 class OscillatorWavetable : public WavetableBase
 {
@@ -277,7 +309,7 @@ public:
         gibbs = false;
         maxMultiplier = 1;
     }
-    void setup(float frequency, int numberPartials, float *partials, float *amplitude, bool gibbs = false, float index = 0.0)
+    virtual void setup(float frequency, int numberPartials, float *partials, float *amplitude, bool gibbs = false, float index = 0.0)
     {
         this->maxMultiplier = 1;
         this->numberPartials = numberPartials;
@@ -287,7 +319,6 @@ public:
         {
             addPart(partials[i], amplitude[i]);
         }
-        
         WavetableBase::setupBase(frequency, Oscillator, index);
         calcParts();
     }
@@ -355,7 +386,7 @@ public:
                     parts[i].sigma = parts[i].amplitude * SynthUtil::getWavetableValue(WAVETABLE_SINE, sigN*sigTL) / sigN;
                 } else
                 {
-                    parts[i].sigma = parts[i].amplitude;
+                    parts[i].sigma = parts[i].amplitude*2;
                 }
                 scale += (float) fabs((double)parts[i].sigma);
             } else
@@ -372,12 +403,16 @@ public:
         {
             value += SynthUtil::getWavetableValue(wavetableIndex, parts[p].index);
             parts[p].index += parts[p].increment;
-            parts[p].index = IndexWrapWavetable(parts[p].index);
+            parts[p].index = indexWrapWavetable(parts[p].index);
         }
+        value += SynthUtil::getWavetableValue(WAVETABLE_SINE, index);
         value /= scale;
-        value += SynthUtil::getWavetableValue(wavetableIndex, index);
+        if (value > 1 || value < -1)
+        {
+            cout << value << "\n";
+        }
         index += indexIncrement;
-        index = IndexWrapWavetable(index);
+        index = indexWrapWavetable(index);
         return value;
     }
 private:
@@ -472,8 +507,8 @@ public:
         
         index += indexIncrement + modulationValue;
         modulationIndex += modulationIncrement;
-        index = IndexWrapWavetable(index);
-        modulationIndex = IndexWrapWavetable(modulationIndex);
+        index = indexWrapWavetable(index);
+        modulationIndex = indexWrapWavetable(modulationIndex);
         
         return value;
     }
@@ -534,8 +569,8 @@ public:
         
         index += indexIncrement;
         modulationIndex += modulationIncrement;
-        index = IndexWrapWavetable(index);
-        modulationIndex = IndexWrapWavetable(index);
+        index = indexWrapWavetable(index);
+        modulationIndex = indexWrapWavetable(index);
         
         return value;
     }
@@ -549,430 +584,15 @@ protected:
 class RingModulationWavetable : public AmplitudeModulationWavetable
 {
 public:
-    virtual void setup(float frequency, float modulationMultiplier, float modulationAmplitude, float index = 0.0)
-    {
-        this->modulationFrequency = frequency * modulationMultiplier;
-        this->modulationAmplitude = modulationAmplitude;
-        
-        modulationIndex = 0;
-        modulationIncrement = SynthUtil::getRadianTableIndex() * modulationFrequency;
-        
-        modulationScale = 1.0 / (1.0 + modulationAmplitude);
-        
-        WavetableBase::setupBase(frequency, RingModulation, index);
-    }
     virtual float generateSample()
     {
         float value = SynthUtil::getWavetableValue(wavetableIndex, index) * modulationAmplitude * SynthUtil::getWavetableValue(wavetableIndex, modulationIndex);
         index += indexIncrement;
         modulationIndex += modulationIncrement;
-        index = IndexWrapWavetable(index);
-        modulationIndex = IndexWrapWavetable(modulationIndex);
+        index = indexWrapWavetable(index);
+        modulationIndex = indexWrapWavetable(modulationIndex);
         
         return value;
     }
 };
 
-//TODO: Set up a way so immediary after a wave switch, the sound carries on.
-class GeneratorContainer
-{
-public:
-    GeneratorContainer()
-    {
-        float partials[4] = {2.0, 3.0, 4.0, 5.0};
-        float amplitudes[4] = {0.80, .60, 0.40, 0.20};
-        setOscillatorData(4, partials, amplitudes, false);
-        setFrequencyModulationData(2.0, 10);
-        setAmplitudeModulationData(2.0, 0.75);
-        setRingModulationData(2.0, 0.75);
-    }
-    void setWaveType(WaveType waveType)
-    {
-        if (this->waveType == waveType)
-            return;
-        
-        this->waveType = waveType;
-        
-        switch(waveType)
-        {
-            case SineWave:
-            {
-                break;
-            }
-            case SawWave:
-            {
-                for (int i = 0; i < sawWaveGenerators.size(); i++)
-                {
-                    sawWaveGenerators[i].setInUse(false);
-                }
-                break;
-            }
-            case TriangleWave:
-            {
-                for (int i = 0; i < triangleWaveGenerators.size(); i++)
-                {
-                    triangleWaveGenerators[i].setInUse(false);
-                }
-                break;
-            }
-            case SquareWave:
-            {
-                for (int i = 0; i < squareWaveGenerators.size(); i++)
-                {
-                    squareWaveGenerators[i].setInUse(false);
-                }
-                break;
-            }
-            case Pulse:
-            {
-                break;
-            }
-            case Summed:
-            {
-                break;
-            }
-            case Oscillator:
-            {
-                for (int i = 0; i < oscillatorWavetables.size(); i++)
-                {
-                    oscillatorWavetables[i].setInUse(false);
-                }
-                return;
-            }
-            case FrequencyModulation:
-            {
-                for (int i = 0; i < frequencyModulationWavetables.size(); i++)
-                {
-                    frequencyModulationWavetables[i].setInUse(false);
-                }
-                return;
-            }
-            case AmplitudeModulation:
-            {
-                for (int i = 0; i < amplitudeModulationWavetables.size(); i++)
-                {
-                    amplitudeModulationWavetables[i].setInUse(false);
-                }
-                return;
-            }
-            case RingModulation:
-            {
-                for (int i = 0; i < ringModulationWavetables.size(); i++)
-                {
-                    ringModulationWavetables[i].setInUse(false);
-                }
-                return;
-            }
-        }
-        //Maybe keep the already created classes, as they don't use much resources
-        //oscillatorWavetables.clear();
-        //frequencyModulationWavetables.clear();
-        //amplitudeModulationWavetables.clear();
-        //ringModulationWavetables.clear();
-    }
-    int getAvailableGenerator()
-    {
-        switch(waveType)
-        {
-            case SineWave:
-            {
-                break;
-            }
-            case SawWave:
-            {
-                for (int i = 0; i < sawWaveGenerators.size(); i++)
-                {
-                    if (!sawWaveGenerators[i].getInUse())
-                    {
-                        return i;
-                    }
-                }
-                sawWaveGenerators.push_back(*new SawWaveGenerator);
-                int index = sawWaveGenerators.size()-1;
-                sawWaveGenerators[index].setInUse(true);
-                return index;
-            }
-            case TriangleWave:
-            {
-                for (int i = 0; i < triangleWaveGenerators.size(); i++)
-                {
-                    if (!triangleWaveGenerators[i].getInUse())
-                    {
-                        return i;
-                    }
-                }
-                triangleWaveGenerators.push_back(*new TriangleWaveGenerator);
-                int index = triangleWaveGenerators.size()-1;
-                triangleWaveGenerators[index].setInUse(true);
-                return index;
-            }
-            case SquareWave:
-            {
-                for (int i = 0; i < squareWaveGenerators.size(); i++)
-                {
-                    if (!squareWaveGenerators[i].getInUse())
-                    {
-                        return i;
-                    }
-                }
-                squareWaveGenerators.push_back(*new SquareWaveGenerator);
-                int index = squareWaveGenerators.size()-1;
-                oscillatorWavetables[index].setInUse(true);
-                squareWaveGenerators[index].setup(440.0, squareWaveData.dutyCycle, squareWaveData.amplitudeMin, squareWaveData.amplitudeMax);
-                return index;
-            }
-            case Pulse:
-            {
-                break;
-            }
-            case Summed:
-            {
-                break;
-            }
-            case Oscillator:
-            {
-                for (int i = 0; i < oscillatorWavetables.size(); i++)
-                {
-                    if (!oscillatorWavetables[i].getInUse())
-                    {
-                        return i;
-                    }
-                }
-                oscillatorWavetables.push_back(*new OscillatorWavetable);
-                int index = oscillatorWavetables.size()-1;
-                oscillatorWavetables[index].setInUse(true);
-                oscillatorWavetables[index].setup(440.0, oscillatorData.numberPartials, &oscillatorData.partials[0], &oscillatorData.amplitude[0], oscillatorData.gibbs);
-                return index;
-            }
-            case FrequencyModulation:
-            {
-                for (int i = 0; i < frequencyModulationWavetables.size(); i++)
-                {
-                    if (!frequencyModulationWavetables[i].getInUse())
-                    {
-                        return i;
-                    }
-                }
-                frequencyModulationWavetables.push_back(*new FrequencyModulationWavetable);
-                int index = frequencyModulationWavetables.size()-1;
-                frequencyModulationWavetables[index].setInUse(true);
-                frequencyModulationWavetables[index].setup(440.0, frequencyModulationData.modulationMultiplier, frequencyModulationData.modulationAmplitude);
-                return index;
-            }
-            case AmplitudeModulation:
-            {
-                for (int i = 0; i < amplitudeModulationWavetables.size(); i++)
-                {
-                    if (!amplitudeModulationWavetables[i].getInUse())
-                    {
-                        return i;
-                    }
-                }
-                amplitudeModulationWavetables.push_back(*new AmplitudeModulationWavetable);
-                int index = amplitudeModulationWavetables.size()-1;
-                amplitudeModulationWavetables[index].setInUse(true);
-                amplitudeModulationWavetables[index].setup(440.0, amplitudeModulationData.modulationMultiplier, amplitudeModulationData.modulationAmplitude);
-                return index;
-            }
-            case RingModulation:
-            {
-                for (int i = 0; i < ringModulationWavetables.size(); i++)
-                {
-                    if (!ringModulationWavetables[i].getInUse())
-                    {
-                        return i;
-                    }
-                }
-                ringModulationWavetables.push_back(*new RingModulationWavetable);
-                int index = ringModulationWavetables.size()-1;
-                ringModulationWavetables[index].setInUse(true);
-                ringModulationWavetables[index].setup(440.0, ringModulationData.modulationMultiplier, amplitudeModulationData.modulationAmplitude);
-                return index;
-
-            }
-        }
-    }
-    SawWaveGenerator * getSawWaveGenerator(int index)
-    {
-        return &sawWaveGenerators[index];
-    }
-    TriangleWaveGenerator * getTriangleWaveGenerator(int index)
-    {
-        return &triangleWaveGenerators[index];
-    }
-    SquareWaveGenerator * getSquareWaveGenerator(int index)
-    {
-        return &squareWaveGenerators[index];
-    }
-    OscillatorWavetable * getOscillatorGenerator(int index)
-    {
-        return &oscillatorWavetables[index];
-    }
-    FrequencyModulationWavetable * getFrequencyModulationGenerator(int index)
-    {
-        return &frequencyModulationWavetables[index];
-    }
-    AmplitudeModulationWavetable * getAmplitudeModulationGenerator(int index)
-    {
-        return &amplitudeModulationWavetables[index];
-    }
-    RingModulationWavetable * getRingModulationGenerator(int index)
-    {
-        return &ringModulationWavetables[index];
-    }
-    void setFreeGenerator(int index)
-    {
-        switch(waveType)
-        {
-            case SineWave:
-            {
-                
-            }
-            case SawWave:
-            {
-                sawWaveGenerators[index].setInUse(false);
-                return;
-            }
-            case TriangleWave:
-            {
-                triangleWaveGenerators[index].setInUse(false);
-            }
-            case SquareWave:
-            {
-                squareWaveGenerators[index].setInUse(false);
-            }
-            case Pulse:
-            {
-                
-            }
-            case Summed:
-            {
-                
-            }
-            case Oscillator:
-            {
-                oscillatorWavetables[index].setInUse(false);
-                return;
-            }
-            case FrequencyModulation:
-            {
-                frequencyModulationWavetables[index].setInUse(false);
-                return;
-            }
-            case AmplitudeModulation:
-            {
-                amplitudeModulationWavetables[index].setInUse(false);
-                return;
-            }
-            case RingModulation:
-            {
-                ringModulationWavetables[index].setInUse(false);
-                return;
-            }
-        }
-    }
-    void setSquareWaveData(float dutyCycle, float amplitudeMin, float amplitudeMax)
-    {
-        squareWaveData.dutyCycle = dutyCycle;
-        squareWaveData.amplitudeMin = amplitudeMin;
-        squareWaveData.amplitudeMax = amplitudeMax;
-        for (int i = 0; squareWaveGenerators.size(); i++)
-        {
-            squareWaveGenerators[i].setup(440.0, dutyCycle, amplitudeMin, amplitudeMax);
-        }
-    }
-    SquareWaveData getSquareWaveData()
-    {
-        return squareWaveData;
-    }
-    void setOscillatorData(int numberPartials, float *partials, float *amplitude, bool gibbs)
-    {
-        //oscillatorWavetable.setup(frequency, numberPartials, partials, amplitude, gibbs);
-        oscillatorData.numberPartials = numberPartials;
-        oscillatorData.partials.clear();
-        oscillatorData.amplitude.clear();
-        for (int i = 0; i < numberPartials; i++)
-        {
-            oscillatorData.partials.push_back(partials[i]);
-            oscillatorData.amplitude.push_back(amplitude[i]);
-        }
-        oscillatorData.gibbs = gibbs;
-        
-        for (int i = 0; oscillatorWavetables.size(); i++)
-        {
-            oscillatorWavetables[i].setup(440.0, numberPartials, &oscillatorData.partials[0], &oscillatorData.amplitude[0], gibbs);
-        }
-    }
-    OscillatorData getOscillatorData()
-    {
-        return oscillatorData;
-    }
-    
-    void setFrequencyModulationData(float modulationMultiplier, float modulationIndexAmplitude)
-    {
-        frequencyModulationData.modulationMultiplier = modulationMultiplier;
-        frequencyModulationData.modulationAmplitude = modulationIndexAmplitude;
-        
-        for (int i = 0; i < frequencyModulationWavetables.size(); i++)
-        {
-            frequencyModulationWavetables[i].setup(440.0, modulationMultiplier, modulationIndexAmplitude);
-        }
-    }
-    ModulationData getFrequencyModulationData()
-    {
-        return frequencyModulationData;
-    }
-    
-    void setAmplitudeModulationData(float modulationMultiplier, float modulationAmplitude)
-    {
-        amplitudeModulationData.modulationMultiplier = modulationMultiplier;
-        amplitudeModulationData.modulationAmplitude;
-        for (int i = 0 ; amplitudeModulationWavetables.size(); i++)
-        {
-            amplitudeModulationWavetables[i].setup(440.0, modulationMultiplier, modulationAmplitude);
-        }
-    }
-    ModulationData getAmplitudeModulationData()
-    {
-        return amplitudeModulationData;
-    }
-    
-    void setRingModulationData(float modulationMultiplier, float modulationAmplitude)
-    {
-        ringModulationData.modulationMultiplier = modulationMultiplier;
-        ringModulationData.modulationAmplitude;
-        
-        for (int i = 0 ; ringModulationWavetables.size(); i++)
-        {
-            ringModulationWavetables[i].setup(440.0, modulationMultiplier, modulationAmplitude);
-        }
-    }
-    ModulationData getRingModulationData()
-    {
-        return ringModulationData;
-    }
-    
-    
-    
-    
-private:
-    WaveType waveType;
-    
-    SquareWaveData squareWaveData;
-    OscillatorData oscillatorData;
-    ModulationData frequencyModulationData;
-    ModulationData amplitudeModulationData;
-    ModulationData ringModulationData;
-    
-    
-    
-    vector<SawWaveGenerator> sawWaveGenerators;
-    vector<TriangleWaveGenerator> triangleWaveGenerators;
-    vector<SquareWaveGenerator> squareWaveGenerators;
-    
-    vector<OscillatorWavetable> oscillatorWavetables;
-    vector<FrequencyModulationWavetable> frequencyModulationWavetables;
-    vector<AmplitudeModulationWavetable> amplitudeModulationWavetables;
-    vector<RingModulationWavetable> ringModulationWavetables;
-};
-extern GeneratorContainer generatorContainer;

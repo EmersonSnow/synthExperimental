@@ -2,7 +2,7 @@
 
 //--------------------------------------------------------------
 void ofApp::setup(){
-    //soundStream.setup(2, 0, AUDIO_SAMPLE_RATE, AUDIO_BUFFER_SIZE, 1);
+    soundStream.setup(2, 0, AUDIO_SAMPLE_RATE, AUDIO_BUFFER_SIZE, 1);
     
     /*storeUnalteredSoundInTable.setup(392.00, SineWave, 44100);
     storeUnalteredSoundInTable.addSegment(2.0, 0.0, 1.0, 0.2);
@@ -80,10 +80,17 @@ void ofApp::setup(){
     envelopeManager.start();
     audioMixer.addInput(&envelopeManager);
     
-    audioMixer.startRecord();
-    audioMixer.setMasterVolume(1.0);
-    audioMixer.setPanning(0.5, PanningLinear);*/
+    audioMixer.startRecord();*/
     
+    float multiplier[4] = {2.0, 3.0, 4.0, 0.5};
+    float amplitude[4] = {1.0, 0.8, 0.6, 0.4};
+    oscillatedWavetableBook.setup(440.0, 4, multiplier, amplitude);
+    audioMixer.addInput(&oscillatedWavetableBook);
+    
+    audioMixer.addInput(&oscillatedWavetableBook)
+    audioMixer.setMasterVolume(1.0);
+    audioMixer.setPanning(0.5, PanningLinear);
+    soundStream.setOutput(audioMixer);
     //soundStream.setup(2, 0, AUDIO_SAMPLE_RATE, AUDIO_BUFFER_SIZE, 1);
     //soundStream.setOutput(synthController.getAudioMixer());
     
@@ -96,7 +103,7 @@ void ofApp::setup(){
     waveManager->start();
     
     waveManager = synthController.getFreeWaveManager();*/
-    synthController.setWaveType(Oscillator);
+    /*synthController.setWaveType(Oscillator);
     synthController.createWaveManagers();
     waveManager = synthController.getFreeWaveManager();
     waveManager->setup(synthController.getWaveType(), SynthUtil::getPanning(0.5, PanningLinear));
@@ -104,7 +111,7 @@ void ofApp::setup(){
     waveManager->getGenerator();
     waveManager->addSegment(2.0, 0.0, 1.0, 0.2);
     waveManager->addSegment(2.0, 1.0, 0.0, 0.2);
-    waveManager->start();
+    waveManager->start();*/
     
     //soundStream.setOutput(audioMixer);
 }

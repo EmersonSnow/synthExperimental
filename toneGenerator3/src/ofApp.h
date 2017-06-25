@@ -1,14 +1,12 @@
 #pragma once
 
 #include "ofMain.h"
-#include "Includes.h"
 //#include "Extern.h"
 //#include "SynthDefinition.h"
 //#include "SynthAudio.h"
 //#include "SynthController.h"
 //#include "WavetableGenerators.h"
-//#include "EnvelopeGenerator.h"
-#include "ofxXmlSettings.h"
+"
 
 
 
@@ -395,162 +393,6 @@ private:
     
 };
 
-class OscillatedWavetableBook : public SoundObject
-{
-public:
-    void setup(float frequency, int numberPartials, float *partials, float *amplitude, int gibbs = 0, float volume = 1.0)
-    {
-        this->maxMultiplier = 1;
-        this->frequency = frequency;
-        this->numberPartials = numberPartials;
-        this->gibbs = gibbs;
-        
-        this->index = 0;
-        this->indexIncrement = SynthUtil::getFrequencyTableIndex() * frequency;
-        
-
-        for (int i = 0; i < numberPartials; i++)
-        {
-            SumPart part;
-            part.index = 0;
-            part.increment = 0;
-            part.multiplier = partials[i];
-            part.amplitude = amplitude[i];
-            part.sigma = amplitude[i];
-            if (part.multiplier > maxMultiplier)
-                maxMultiplier = part.multiplier;
-            parts.push_back(part);
-        }
-        calcParts();;
-    }
-    
-    void calcParts()
-    {
-        float tableDivideTwo = (float) WAVETABLE_SIZE / 2.0;
-        scale = 0;
-        countPartials = 0;
-        float sigK = 0;
-        float sigN = 0;
-        float sigTL = 0;
-        if (gibbs)
-        {
-            sigK = PI / maxMultiplier;
-            sigTL = tableDivideTwo;
-        }
-        for (int i = 0; i < parts.size(); i++)
-        {
-            parts[i].increment = indexIncrement * parts[i].multiplier;
-            if (parts[i].increment < tableDivideTwo)
-            {
-                if (gibbs && (parts[i].multiplier > 0))
-                {
-                    sigN = sigK * parts[i].multiplier;
-                    parts[i].sigma = parts[i].amplitude * SynthUtil::getWavetableValue(WAVETABLE_SINE, sigN*sigTL) / sigN;
-                } else
-                {
-                    parts[i].sigma = parts[i].amplitude;
-                }
-                scale += (float) fabs((double)parts[i].sigma);
-            } else
-            {
-                parts[i].sigma = 0;
-            }
-        }
-        
-    }
-    inline float IndexCheck(float index)
-    {
-        if (index >= WAVETABLE_SIZE)
-        {
-            do
-                index -= WAVETABLE_SIZE;
-            while (index >= WAVETABLE_SIZE);
-        }
-        else if (index < 0)
-        {
-            do
-                index += WAVETABLE_SIZE;
-            while (index < 0);
-        }
-        return index;
-    }
-    void processAudio(ofSoundBuffer &in, ofSoundBuffer &out)
-    {
-        int numFrames = out.getNumFrames();
-        int numChannels = out.getNumChannels();
-        float v = 0;
-        for (int i = 0; i < numFrames; i++)
-        {
-            v = 0;
-            for (int p = 0; p < parts.size(); p++)
-            {
-                //if (parts[p].index >= WAVETABLE_SIZE)
-                //{
-                //    while (parts[p].index >= WAVETABLE_SIZE)
-                //    {
-                //        parts[p].index -= WAVETABLE_SIZE;
-                //    }
-                //} else if (parts[p].index < 0)
-                //{
-                //    while (parts[p].index < 0)
-                //    {
-                //        parts[p].index += WAVETABLE_SIZE;
-                //    }
-                //}
-                parts[p].index = IndexCheck(parts[p].index);
-                v += SynthUtil::getWavetableValue(WAVETABLE_SINE, parts[p].index);
-                parts[p].index += parts[p].increment;
-            }
-            v /= scale;
-            
-            index = IndexCheck(index);
-            if (index >= WAVETABLE_SIZE)
-            {
-                while (index >= WAVETABLE_SIZE)
-                {
-                    index -= WAVETABLE_SIZE;
-                }
-            } else if (index < 0)
-            {
-                while (index < 0)
-                {
-                    index += WAVETABLE_SIZE;
-                }
-            }
-            v += SynthUtil::getWavetableValue(WAVETABLE_SINE, index);
-            index += indexIncrement;
-            
-            
-            for (int c = 0; c < numChannels; c++)
-            {
-                out[i*numChannels +c] = v * 1.0;
-            }
-            //cout << SynthUtil::getOscillatedWavetableValue(SynthUtil::getOscillatedWavetableIndex(frequency), 4, sampleIndex) << "\n";
-        }
-    }
-private:
-    int numberPartials;
-    int countPartials;
-    bool gibbs;
-    float frequency;
-    float volume;
-    float index;
-    float indexIncrement;
-    float maxMultiplier;
-    float scale;
-    struct SumPart
-    {
-        float index;
-        float increment;
-        float multiplier;
-        float amplitude;
-        float sigma;
-    };
-    vector<SumPart> parts;
-    
-    
-    
-};
 class FrequencyModulation : public SoundObject
 {
 public:
@@ -964,6 +806,163 @@ private:
 };
 */
 
+class OscillatedWavetableBook : public SoundObject
+{
+public:
+    void setup(float frequency, int numberPartials, float *partials, float *amplitude, int gibbs = 0, float volume = 1.0)
+    {
+        this->maxMultiplier = 1;
+        this->frequency = frequency;
+        this->numberPartials = numberPartials;
+        this->gibbs = gibbs;
+        
+        this->index = 0;
+        this->indexIncrement = SynthUtil::getFrequencyTableIndex() * frequency;
+        
+        
+        for (int i = 0; i < numberPartials; i++)
+        {
+            SumPart part;
+            part.index = 0;
+            part.increment = 0;
+            part.multiplier = partials[i];
+            part.amplitude = amplitude[i];
+            part.sigma = amplitude[i];
+            if (part.multiplier > maxMultiplier)
+                maxMultiplier = part.multiplier;
+            parts.push_back(part);
+        }
+        calcParts();;
+    }
+    
+    void calcParts()
+    {
+        float tableDivideTwo = (float) WAVETABLE_SIZE / 2.0;
+        scale = 0;
+        countPartials = 0;
+        float sigK = 0;
+        float sigN = 0;
+        float sigTL = 0;
+        if (gibbs)
+        {
+            sigK = PI / maxMultiplier;
+            sigTL = tableDivideTwo;
+        }
+        for (int i = 0; i < parts.size(); i++)
+        {
+            parts[i].increment = indexIncrement * parts[i].multiplier;
+            if (parts[i].increment < tableDivideTwo)
+            {
+                if (gibbs && (parts[i].multiplier > 0))
+                {
+                    sigN = sigK * parts[i].multiplier;
+                    parts[i].sigma = parts[i].amplitude * SynthUtil::getWavetableValue(WAVETABLE_SINE, sigN*sigTL) / sigN;
+                } else
+                {
+                    parts[i].sigma = parts[i].amplitude;
+                }
+                scale += (float) fabs((double)parts[i].sigma);
+            } else
+            {
+                parts[i].sigma = 0;
+            }
+        }
+        
+    }
+    inline float IndexCheck(float index)
+    {
+        if (index >= WAVETABLE_SIZE)
+        {
+            do
+                index -= WAVETABLE_SIZE;
+            while (index >= WAVETABLE_SIZE);
+        }
+        else if (index < 0)
+        {
+            do
+                index += WAVETABLE_SIZE;
+            while (index < 0);
+        }
+        return index;
+    }
+    void processAudio(ofSoundBuffer &in, ofSoundBuffer &out)
+    {
+        int numFrames = out.getNumFrames();
+        int numChannels = out.getNumChannels();
+        float v = 0;
+        for (int i = 0; i < numFrames; i++)
+        {
+            v = 0;
+            for (int p = 0; p < parts.size(); p++)
+            {
+                //if (parts[p].index >= WAVETABLE_SIZE)
+                //{
+                //    while (parts[p].index >= WAVETABLE_SIZE)
+                //    {
+                //        parts[p].index -= WAVETABLE_SIZE;
+                //    }
+                //} else if (parts[p].index < 0)
+                //{
+                //    while (parts[p].index < 0)
+                //    {
+                //        parts[p].index += WAVETABLE_SIZE;
+                //    }
+                //}
+                parts[p].index = IndexCheck(parts[p].index);
+                v += SynthUtil::getWavetableValue(WAVETABLE_SINE, parts[p].index);
+                parts[p].index += parts[p].increment;
+            }
+            v /= scale;
+            
+            index = IndexCheck(index);
+            if (index >= WAVETABLE_SIZE)
+            {
+                while (index >= WAVETABLE_SIZE)
+                {
+                    index -= WAVETABLE_SIZE;
+                }
+            } else if (index < 0)
+            {
+                while (index < 0)
+                {
+                    index += WAVETABLE_SIZE;
+                }
+            }
+            v += SynthUtil::getWavetableValue(WAVETABLE_SINE, index);
+            index += indexIncrement;
+            
+            
+            for (int c = 0; c < numChannels; c++)
+            {
+                out[i*numChannels +c] = v * 1.0;
+            }
+            //cout << SynthUtil::getOscillatedWavetableValue(SynthUtil::getOscillatedWavetableIndex(frequency), 4, sampleIndex) << "\n";
+        }
+    }
+private:
+    int numberPartials;
+    int countPartials;
+    bool gibbs;
+    float frequency;
+    float volume;
+    float index;
+    float indexIncrement;
+    float maxMultiplier;
+    float scale;
+    struct SumPart
+    {
+        float index;
+        float increment;
+        float multiplier;
+        float amplitude;
+        float sigma;
+    };
+    vector<SumPart> parts;
+    
+    
+    
+};
+
 class ofApp : public ofBaseApp{
 
 	public:
@@ -996,14 +995,14 @@ class ofApp : public ofBaseApp{
     NoiseGenerator noiseGenerator;
     AmplitudeModulationWavetable amplitudeModulationWavetable;
     FrequencyModulationRefactored frequencyModulationRefactored;
-    FrequencyModulationRefactoredWavetable frequencyModulationRefactoredWavetable;
+    FrequencyModulationRefactoredWavetable frequencyModulationRefactoredWavetable;*/
     OscillatedWavetableBook oscillatedWavetableBook;
-    AmplitudeModulationWavetableExample
-    amplitudeModulationWavetableExample;*/
+    //AmplitudeModulationWavetableExample
+    //amplitudeModulationWavetableExample;
     //EnvelopeManagerRewrite envelopeManager;
     
-    //AudioMixer audioMixer;
-    //ofSoundStream soundStream;
-    WaveManager * waveManager;
+    AudioMixer audioMixer;
+    ofSoundStream soundStream;
+    //WaveManager * waveManager;
     
 };

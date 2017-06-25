@@ -8,5 +8,4 @@
 
 #include <Includes.h>
 
-SynthController synthController = *new SynthController();
-GeneratorContainer generatorContainer = *new GeneratorContainer();
+

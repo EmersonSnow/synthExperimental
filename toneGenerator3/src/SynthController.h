@@ -43,9 +43,9 @@ public:
         {
             WaveManager temp;
             temp.setup(waveType, SynthUtil::getPanning(0.5, PanningLinear));
-            waveManagers.push_back(*new WaveManager());
+            waveManagers.push_back(temp);
             int index = waveManagers.size()-1;
-            audioMixer.addInput(&waveManagers[index]);
+            //audioMixer.AddWave();
         }
         soundStream.setOutput(audioMixer);
     }
@@ -70,13 +70,13 @@ public:
         return &waveManagers[index];
     }
     
+    vector<WaveManager> waveManagers;
 private:
     AudioMixer audioMixer;
     WaveType waveType; //Just this for now
     
     ofSoundStream soundStream;
     
-    vector<WaveManager> waveManagers;
     //vector<bool> envelopeMangersInUse;
 };
 

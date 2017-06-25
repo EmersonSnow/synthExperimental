@@ -8,6 +8,9 @@
 
 #include <SynthDefinition.h>
 
+SynthController synthController;
+GeneratorContainer generatorContainer;
+
 float SynthUtil::noteFrequencies[MIDI_NOTE_NUMBER];
 PanningData SynthUtil::panningLinear;
 PanningData SynthUtil::panningSquared;
