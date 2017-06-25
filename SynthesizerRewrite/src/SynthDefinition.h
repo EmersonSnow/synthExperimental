@@ -10,7 +10,6 @@
 
 #include "ofMain.h"
 
-
 #define ONE_DIVIDE_PI 1.0/PI
 #define TWO_DIVIDE_PI 2.0/PI
 
@@ -39,7 +38,7 @@
 #define WAVETABLE_TRIANGLE_POSITIVE 9
 
 
-#define AUDIO_BUFFER_SIZE 8016
+#define AUDIO_BUFFER_SIZE 4096
 #define AUDIO_SAMPLE_RATE 44100
 #define AUDIO_CHANNEL_NUMBER 2
 
@@ -107,6 +106,7 @@ struct SquareWaveData
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct Segment
 {
     float duration;
@@ -136,17 +136,32 @@ struct EnvelopeInstance
     vector<SegmentInstance> segmentsSustain;
     SegmentInstance segmentRelease;
 };
+enum EnvelopeStage
+{
+    EnvelopeStart,
+    EnvelopeDelay,
+    EnvelopeAttack,
+    EnvelopeDecay,
+    EnvelopeSustain,
+    EnvelopeRelease,
+    EnvelopeEnd,
+    EnvelopeCutoff
+};
 struct SynthPreset
 {
-    float duration;
+    WaveType waveType;
     Panning panning;
+    
+    OscillatorData oscillatorData;
+    ModulationData modulationData;
+    SquareWaveData squareWaveData;
     
     Envelope envelope;
 };
 
 struct SynthPresetInstance
 {
-    float duration;
+    WaveType waveType;
     Panning panning;
     
     EnvelopeInstance envelopeInstance;
@@ -469,126 +484,5 @@ private:
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-class SynthSettings
-{
-public:
-    SynthSettings()
-    {
-        setWaveType(SineWave);
-        float partials[4] = {2.0, 3.0, 4.0, 5.0};
-        float amplitudes[4] = {0.80, .60, 0.40, 0.20};
-        setOscillatorData(4, partials, amplitudes, false);
-        setFrequencyModulationData(2.0, 10);
-        setAmplitudeModulationData(2.0, 0.75);
-        setRingModulationData(2.0, 0.75);
-        
-        buildPreset();
-    }
-    void setWaveType(WaveType waveType)
-    {
-        this->waveType = waveType;
-    }
-    WaveType getWaveType()
-    {
-        return waveType;
-    }
-    void setSquareWaveData(float dutyCycle, float amplitudeMin, float amplitudeMax)
-    {
-        squareWaveData.dutyCycle = dutyCycle;
-        squareWaveData.amplitudeMin = amplitudeMin;
-        squareWaveData.amplitudeMax = amplitudeMax;
-    }
-    SquareWaveData getSquareWaveData()
-    {
-        return squareWaveData;
-    }
-    void setOscillatorData(int numberPartials, float *partials, float *amplitude, bool gibbs)
-    {
-        //oscillatorWavetable.setup(frequency, numberPartials, partials, amplitude, gibbs);
-        oscillatorData.numberPartials = numberPartials;
-        oscillatorData.partials.clear();
-        oscillatorData.amplitude.clear();
-        for (int i = 0; i < numberPartials; i++)
-        {
-            oscillatorData.partials.push_back(partials[i]);
-            oscillatorData.amplitude.push_back(amplitude[i]);
-        }
-        oscillatorData.gibbs = gibbs;
-    }
-    OscillatorData getOscillatorData()
-    {
-        return oscillatorData;
-    }
-    
-    void setFrequencyModulationData(float modulationMultiplier, float modulationIndexAmplitude)
-    {
-        frequencyModulationData.modulationMultiplier = modulationMultiplier;
-        frequencyModulationData.modulationAmplitude = modulationIndexAmplitude;
-    }
-    ModulationData getFrequencyModulationData()
-    {
-        return frequencyModulationData;
-    }
-    
-    void setAmplitudeModulationData(float modulationMultiplier, float modulationAmplitude)
-    {
-        amplitudeModulationData.modulationMultiplier = modulationMultiplier;
-        amplitudeModulationData.modulationAmplitude;
-    }
-    ModulationData getAmplitudeModulationData()
-    {
-        return amplitudeModulationData;
-    }
-    
-    void setRingModulationData(float modulationMultiplier, float modulationAmplitude)
-    {
-        ringModulationData.modulationMultiplier = modulationMultiplier;
-        ringModulationData.modulationAmplitude;
-    }
-    ModulationData getRingModulationData()
-    {
-        return ringModulationData;
-    }
-    
-    void buildPreset()
-    {
-        defaultPreset.duration = 5.0;
-        defaultPreset.panning = SynthUtil::getPanning(0.5, PanningLinear);
-        defaultPreset.envelope.segmentDelay.duration = 0.25;
-        defaultPreset.envelope.segmentDelay.volumeStart = 0;
-        defaultPreset.envelope.segmentDelay.volumeEnd = 0;
-        defaultPreset.envelope.segmentDelay.exponential = 0;
-        
-        defaultPreset.envelope.segmentAttack.duration = 0.5;
-        defaultPreset.envelope.segmentAttack.volumeStart = 0;
-        defaultPreset.envelope.segmentAttack.volumeEnd = 1.0;
-        defaultPreset.envelope.segmentAttack.exponential = 0.2;
-        
-        defaultPreset.envelope.segmentDecay.duration = 0.25;
-        defaultPreset.envelope.segmentDecay.volumeStart = 1.0;
-        defaultPreset.envelope.segmentDecay.volumeEnd = 0.75;
-        defaultPreset.envelope.segmentDecay.exponential = 0.2;
-        
-        defaultPreset.envelope.segmentsSustain.push_back(defaultPreset.envelope.segmentDelay);
-        defaultPreset.envelope.segmentsSustain[0].duration = 2.0;
-        defaultPreset.envelope.segmentsSustain[0].volumeStart = 0.75;
-        defaultPreset.envelope.segmentsSustain[0].volumeEnd = 0.5;
-        defaultPreset.envelope.segmentsSustain[0].exponential = 0.4;
-        
-        defaultPreset.envelope.segmentRelease.duration = 10;
-        defaultPreset.envelope.segmentRelease.volumeStart = 0.5;
-        defaultPreset.envelope.segmentRelease.volumeEnd = 0;
-        defaultPreset.envelope.segmentRelease.exponential = 0.2;
-    }
-    SynthPreset defaultPreset;
-private:
-    WaveType waveType;
-    
-    SquareWaveData squareWaveData;
-    OscillatorData oscillatorData;
-    ModulationData frequencyModulationData;
-    ModulationData amplitudeModulationData;
-    ModulationData ringModulationData;
-};
-extern SynthSettings synthSettings;
+
 

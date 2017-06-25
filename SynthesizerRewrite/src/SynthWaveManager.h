@@ -8,85 +8,15 @@
 
 #pragma once
 
-#include "SynthDefinition.h"
-#include "SynthGenerators.h"
-#include "SynthPreset.h"
-class CurveExponentGenerator
-{
-public:
-    void generate(float durationSample, float curvature, bool bAscending)
-    {
-        if (bAscending)
-        {
-            exponentMul = pow((curvature+1.0)/curvature, 1.0/float(durationSample));
-            exponentNow = curvature;
-            
-        } else
-        {
-            exponentMul = pow(curvature/(1.0+curvature), 1.0/durationSample);
-            exponentNow = curvature+1.0;
-        }
-        for (int i = 0; i < durationSample; i++)
-        {
-            exponentNow *= exponentMul;
-            curve.push_back((exponentNow - curvature) * 1.0);
-        }
-        bGenerated = true;
-    }
-    void generateMappedCurve(float volumeStart, float volumeEnd)
-    {
-        if (!bGenerated)
-            return;
-        if (volumeStart < volumeEnd)
-        {
-            for (int i = 0; i < curve.size(); i++)
-            {
-                curveMapped.push_back(ofMap(curve[i], 0.0, 1.0, volumeStart, volumeEnd, true));
-            }
-        } else
-        {
-            for (int i = 0; i < curve.size(); i++)
-            {
-                curveMapped.push_back(ofMap(curve[i], 1.0, 0.0, volumeStart, volumeEnd, true));
-            }
-        }
-    }
-    void clear()
-    {
-        curve.clear();
-        curveMapped.clear();
-    }
-    vector<float> curve;
-    vector<float> curveMapped;
-    
-private:
-    bool bGenerated = false;
-    int durationSample;
-    float exponentMin;
-    float exponentMul;
-    float exponentNow;
-};
-enum EnvelopeStage
-{
-    EnvelopeStart,
-    EnvelopeDelay,
-    EnvelopeAttack,
-    EnvelopeDecay,
-    EnvelopeSustain,
-    EnvelopeRelease,
-    EnvelopeEnd,
-    EnvelopeCutoff
-};
+#include "SynthWaveInstance.h"
 
-struct WaveInstance
+struct WaveInstanceStruct
 {
     bool bFree;
     bool bStart;
     bool bGenerator;
-    bool bFinished;
     EnvelopeStage stage;
-    int currentSampleCount;
-    int currentSegmentIndex;
+    int stageSampleCount;
     int curveIndex;
     int generatorIndex;
     float frequency;
@@ -94,6 +24,129 @@ struct WaveInstance
     float samples[AUDIO_BUFFER_SIZE*2];
 };
 
+class EnvelopeGenerator
+{
+public:
+    
+    EnvelopeGenerator()
+    {
+        stageSampleCount = 0;
+        index = 0;
+        volume = 0.0;
+        stage = EnvelopeStart;
+    }
+    void reset()
+    {
+        stageSampleCount = 0;
+        index = 0;
+        volume = 0;
+        stage = EnvelopeStart;
+    }
+    void getStage()
+    {
+        return stage;
+    }
+    float generate()
+    {
+        switch(stage)
+        {
+            case EnvelopeStart:
+            {
+                index = 0;
+                stage = EnvelopeDelay;
+                break;
+            }
+            case EnvelopeDelay:
+            {
+                return calcEnvelopeStage(synthSettings.currentPresetInstance.envelopeInstance.segmentDelay);
+                break;
+            }
+            case EnvelopeAttack:
+            {
+                return calcEnvelopeStage(synthSettings.currentPresetInstance.envelopeInstance.segmentAttack);
+                break;
+            }
+            case EnvelopeDecay:
+            {
+                return calcEnvelopeStage(synthSettings.currentPresetInstance.envelopeInstance.segmentDecay);
+                break;
+            }
+            case EnvelopeSustain:
+            {
+                return calcEnvelopeStage(synthSettings.currentPresetInstance.envelopeInstance.segmentsSustain[0]);
+                break;
+            }
+            case EnvelopeRelease:
+            {
+                return calcEnvelopeStage(synthSettings.currentPresetInstance.envelopeInstance.segmentRelease);
+                break;
+            }
+            case EnvelopeEnd:
+            {
+                reset();
+                break;
+            }
+            case EnvelopeCutoff:
+            {
+                //Do cutoff
+                break;
+            }
+        }
+    }
+    
+    void calcEnvelopeStage(SegmentInstance & segmentInstance)
+    {
+        if (!segmentInstance.bVolumeChange)
+        {
+            volume = segmentInstance.volumeEnd;
+            if (segmentInstance.sampleDuration <= stageSampleCount)
+            {
+                stageSampleCount = 0;
+                stage = getNextStage(stage);
+            }
+        } else
+        {
+            if (segmentInstance.sampleDuration >= stageSampleCount)
+            {
+                volume = segmentInstance.curveExponential[index];
+                index++;
+            } else
+            {
+                index = 0;
+                stageSampleCount = 0;
+                stage = getNextStage(stage);
+            }
+        }
+    }
+    void calcEnvelopeCutoff(WaveInstanceStruct & waveInstanceStruct, SegmentInstance & segmentInstance)
+    {
+        
+    }
+    EnvelopeStage getNextStage(EnvelopeStage stage)
+    {
+        if (stage == EnvelopeDelay)
+        {
+            return EnvelopeAttack;
+        } else if (stage == EnvelopeAttack)
+        {
+            return EnvelopeDecay;
+        } else if (stage == EnvelopeDecay)
+        {
+            return EnvelopeSustain;
+        } else if (stage == EnvelopeSustain)
+        {
+            return EnvelopeRelease;
+        } else if (stage == EnvelopeRelease)
+        {
+            return EnvelopeEnd;
+        }
+    }
+private:
+    int stageSampleCount;
+    int index;
+    float volume;
+    EnvelopeStage stage;
+};
 
 class SynthWaveManager : public ofBaseSoundOutput
 {
@@ -101,7 +154,7 @@ private:
     ofSoundBuffer workingBuffer;
     ofSoundStream soundStream;
     
-    struct GeneratorContainer
+    struct GeneratorContainerClass
     {
         vector<SawWaveGenerator> sawWaveGenerators;
         vector<TriangleWaveGenerator> triangleWaveGenerators;
@@ -112,7 +165,7 @@ private:
         vector<AmplitudeModulationWavetable> amplitudeModulationGenerators;
         vector<RingModulationWavetable> ringModulationGenerators;
         
-    } generatorContainer;
+    } generatorContainerClass;
     
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -123,9 +176,9 @@ private:
     SynthPresetInstance synthPresetInstance;
     CurveExponentGenerator curveExponentGenerator;
     
-    int activeWaveInstanceCount;
+    //int activewaveInstanceStructCount;
+    //vector<WaveInstanceStruct> waveInstanceStructs;
     vector<WaveInstance> waveInstances;
-    
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -141,7 +194,6 @@ public:
         bSynthPresetInialised = false;
         bRecord = false;
         
-        activeWaveInstanceCount = 0;
         
         setMixerMasterVolume(1.0);
         mixerPanning.left = 1.0;
@@ -150,7 +202,7 @@ public:
         soundStream.setup(AUDIO_CHANNEL_NUMBER, 0, AUDIO_SAMPLE_RATE, AUDIO_BUFFER_SIZE, 1);
         soundStream.setOutput(this);
         
-        loadSynthPreset(synthSettings.defaultPreset);
+        loadSynthPreset(synthSettings.currnetPreset);
         inialiseSynthPreset();
     }
     
@@ -168,7 +220,6 @@ public:
         if (!bSynthPresetLoaded)
             return;
         
-        synthPresetInstance.duration = synthPreset.duration;
         //TEMP
         //synthPresetInstance.panning = synthPreset.panning;
         synthPresetInstance.panning.left = 1.0;
@@ -230,21 +281,15 @@ public:
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    void playDoAllWaveInstance(float frequency)
-    {
-        WaveInstance * current = getWaveInstance(frequency);
-        getAvailableGenerator(*current);
-        startWaveInstance(*current);
-    }
     
-    WaveInstance * getWaveInstance(float frequency)
+    int getWaveInstance(float frequency = 440.0)
     {
         //Look for a free wave instance
         bool bCreateNewInstance = true;
         int index;
         for (int i = 0; i < waveInstances.size(); i++)
         {
-            if (waveInstances[i].bFree)
+            if (waveInstances[i].getInUse())
             {
                 index = i;
                 bCreateNewInstance = false;
@@ -253,391 +298,24 @@ public:
         }
         if (bCreateNewInstance)
         {
-            waveInstances.push_back(*new WaveInstance);
+            WaveInstance waveInstance;
+            waveInstances.push_back(waveInstance);
             index = waveInstances.size()-1;
-            resetWaveInstance(waveInstances[index], false, frequency);
-            activeWaveInstanceCount++;
-            return &waveInstances[index];
+            return index;
         } else
         {
-            waveInstances[index].frequency = frequency;
-            activeWaveInstanceCount++;
-            return &waveInstances[index];
+            waveInstances[index].setFrequency(frequency);
+            return index;
         }
     }
-    void resetWaveInstance(WaveInstance & waveInstance, bool bFree = true, float frequency = 440.0)
+    void startWaveInstance(int index)
     {
-        waveInstance.bFree = bFree;
-        waveInstance.bStart = false;
-        waveInstance.bFinished = false;
-        waveInstance.bGenerator = false;
-        waveInstance.stage = EnvelopeStart;
-        waveInstance.currentSampleCount = 0;
-        waveInstance.currentSegmentIndex = 0;
-        waveInstance.generatorIndex = 0;
-        waveInstance.frequency = frequency;
-        waveInstance.volume = 0.0;
+        waveInstances[index].start();
     }
-    void setFree(WaveInstance & waveInstance)
-    {
-        switch(synthSettings.getWaveType())
-        {
-            case SineWave:
-            {
-                break;
-            }
-            case SawWave:
-            {
-                generatorContainer.sawWaveGenerators[waveInstance.generatorIndex].setInUse(false);
-                break;
-            }
-            case TriangleWave:
-            {
-                generatorContainer.triangleWaveGenerators[waveInstance.generatorIndex].setInUse(false);
-                break;
-            }
-            case SquareWave:
-            {
-                generatorContainer.squareWaveGenerators[waveInstance.generatorIndex].setInUse(false);
-                break;
-            }
-            case Pulse:
-            {
-                break;
-            }
-            case Summed:
-            {
-                break;
-            }
-            case Oscillator:
-            {
-                generatorContainer.oscillatorGenerators[waveInstance.generatorIndex].setInUse(false);
-                break;
-            }
-            case FrequencyModulation:
-            {
-                generatorContainer.frequencyModulationGenerators[waveInstance.generatorIndex].setInUse(false);
-                break;
-            }
-            case AmplitudeModulation:
-            {
-                generatorContainer.amplitudeModulationGenerators[waveInstance.generatorIndex].setInUse(false);
-                break;
-            }
-            case RingModulation:
-            {
-                generatorContainer.ringModulationGenerators[waveInstance.generatorIndex].setInUse(false);
-                break;
-            }
-        }
-        resetWaveInstance(waveInstance);
-    }
-    void startWaveInstance(WaveInstance & waveInstance)
-    {
-        getAvailableGenerator(waveInstance);
-        waveInstance.bStart = true;
-    }
-    int getNumberActiveWaveInstances()
-    {
-        int count = 0;
-        for (int i = 0; i < waveInstances.size(); i++)
-        {
-            if (!waveInstances[i].bFree)
-                count++;
-        }
-        return count;
-    }
-    void getAvailableGenerator(WaveInstance & waveInstance)
-    {
-        switch(synthSettings.getWaveType())
-        {
-            case SineWave:
-            {
-                break;
-            }
-            case SawWave:
-            {
-                for (int i = 0; i < generatorContainer.sawWaveGenerators.size(); i++)
-                {
-                    if (!generatorContainer.sawWaveGenerators[i].getInUse())
-                    {
-                        generatorContainer.sawWaveGenerators[i].setup(waveInstance.frequency);
-                        waveInstance.bGenerator = true;
-                        waveInstance.generatorIndex = i;
-                        return;
-                    }
-                }
-                generatorContainer.sawWaveGenerators.push_back(*new SawWaveGenerator);
-                int index = generatorContainer.sawWaveGenerators.size()-1;
-                generatorContainer.sawWaveGenerators[index].setInUse(true);
-                generatorContainer.sawWaveGenerators[index].setup(waveInstance.frequency);
-                waveInstance.bGenerator = true;
-                waveInstance.generatorIndex = index;
-                return;
-            }
-            case TriangleWave:
-            {
-                for (int i = 0; i < generatorContainer.triangleWaveGenerators.size(); i++)
-                {
-                    if (!generatorContainer.triangleWaveGenerators[i].getInUse())
-                    {
-                        waveInstance.bGenerator = true;
-                        waveInstance.generatorIndex = i;
-                        return;
-                    }
-                }
-                generatorContainer.triangleWaveGenerators.push_back(*new TriangleWaveGenerator);
-                int index = generatorContainer.triangleWaveGenerators.size()-1;
-                generatorContainer.triangleWaveGenerators[index].setInUse(true);
-                generatorContainer.triangleWaveGenerators[index].setup(waveInstance.frequency);
-                waveInstance.bGenerator = true;
-                waveInstance.generatorIndex = index;
-                return;
-            }
-            case SquareWave:
-            {
-                for (int i = 0; i < generatorContainer.squareWaveGenerators.size(); i++)
-                {
-                    if (!generatorContainer.squareWaveGenerators[i].getInUse())
-                    {
-                        waveInstance.bGenerator = true;
-                        waveInstance.generatorIndex = i;
-                        return;
-                    }
-                }
-                generatorContainer.squareWaveGenerators.push_back(*new SquareWaveGenerator);
-                int index = generatorContainer.squareWaveGenerators.size()-1;
-                generatorContainer.squareWaveGenerators[index].setInUse(true);
-                SquareWaveData squareWaveData = synthSettings.getSquareWaveData();
-                generatorContainer.squareWaveGenerators[index].setup(waveInstance.frequency, squareWaveData.dutyCycle, squareWaveData.amplitudeMin, squareWaveData.amplitudeMax);
-                cout << "Got here \n";
-                waveInstance.bGenerator = true;
-                waveInstance.generatorIndex = index;
-                return;
-            }
-            case Pulse:
-            {
-                break;
-            }
-            case Summed:
-            {
-                break;
-            }
-            case Oscillator:
-            {
-                for (int i = 0; i < generatorContainer.oscillatorGenerators.size(); i++)
-                {
-                    if (!generatorContainer.oscillatorGenerators[i].getInUse())
-                    {
-                        generatorContainer.oscillatorGenerators[i].setFrequency(waveInstance.frequency);
-                        waveInstance.bGenerator = true;
-                        waveInstance.generatorIndex = i;
-                        return;
-                    }
-                }
-                generatorContainer.oscillatorGenerators.push_back(*new OscillatorWavetable);
-                int index = generatorContainer.oscillatorGenerators.size()-1;
-                generatorContainer.oscillatorGenerators[index].setInUse(true);
-                OscillatorData oscillatorData = synthSettings.getOscillatorData();
-                generatorContainer.oscillatorGenerators[index].setup(waveInstance.frequency, oscillatorData.numberPartials, &oscillatorData.partials[0], &oscillatorData.amplitude[0], oscillatorData.gibbs);
-                waveInstance.bGenerator = true;
-                waveInstance.generatorIndex = index;
-                return;
-            }
-            case FrequencyModulation:
-            {
-                for (int i = 0; i < generatorContainer.frequencyModulationGenerators.size(); i++)
-                {
-                    if (!generatorContainer.frequencyModulationGenerators[i].getInUse())
-                    {
-                        waveInstance.bGenerator = true;
-                        waveInstance.generatorIndex = i;
-                        return ;
-                    }
-                }
-                generatorContainer.frequencyModulationGenerators.push_back(*new FrequencyModulationWavetable);
-                int index = generatorContainer.frequencyModulationGenerators.size()-1;
-                generatorContainer.frequencyModulationGenerators[index].setInUse(true);
-                ModulationData frequencyModulationData = synthSettings.getFrequencyModulationData();
-                generatorContainer.frequencyModulationGenerators[index].setup(waveInstance.frequency, frequencyModulationData.modulationMultiplier, frequencyModulationData.modulationAmplitude);
-                waveInstance.bGenerator = true;
-                waveInstance.generatorIndex = index;
-                return;
-            }
-            case AmplitudeModulation:
-            {
-                for (int i = 0; i < generatorContainer.amplitudeModulationGenerators.size(); i++)
-                {
-                    if (!generatorContainer.amplitudeModulationGenerators[i].getInUse())
-                    {
-                        waveInstance.bGenerator = true;
-                        waveInstance.generatorIndex = i;
-                        return;
-                    }
-                }
-                generatorContainer.amplitudeModulationGenerators.push_back(*new AmplitudeModulationWavetable);
-                int index = generatorContainer.amplitudeModulationGenerators.size()-1;
-                generatorContainer.amplitudeModulationGenerators[index].setInUse(true);
-                ModulationData amplitudeModulationData = synthSettings.getAmplitudeModulationData();
-                generatorContainer.amplitudeModulationGenerators[index].setup(waveInstance.frequency, amplitudeModulationData.modulationMultiplier, amplitudeModulationData.modulationAmplitude);
-                waveInstance.bGenerator = true;
-                waveInstance.generatorIndex = index;
-                return;
-            }
-            case RingModulation:
-            {
-                for (int i = 0; i < generatorContainer.ringModulationGenerators.size(); i++)
-                {
-                    if (!generatorContainer.ringModulationGenerators[i].getInUse())
-                    {
-                        waveInstance.bGenerator = true;
-                        waveInstance.generatorIndex = i;
-                        return;
-                    }
-                }
-                generatorContainer.ringModulationGenerators.push_back(*new RingModulationWavetable);
-                int index = generatorContainer.ringModulationGenerators.size()-1;
-                generatorContainer.ringModulationGenerators[index].setInUse(true);
-                ModulationData ringModulationData = synthSettings.getRingModulationData();
-                generatorContainer.ringModulationGenerators[index].setup(waveInstance.frequency, ringModulationData.modulationMultiplier, ringModulationData.modulationAmplitude);
-                waveInstance.bGenerator = true;
-                waveInstance.generatorIndex = index;
-                return;
-            }
-        }
-    }
-    /*SawWaveGenerator * getSawWaveGenerator(int index)
-    {
-        return &generatorContainer.sawWaveGenerators[index];
-    }
-    TriangleWaveGenerator * getTriangleWaveGenerator(int index)
-    {
-        return &generatorContainer.triangleWaveGenerators[index];
-    }
-    SquareWaveGenerator * getSquareWaveGenerator(int index)
-    {
-        return &generatorContainer.squareWaveGenerators[index];
-    }
-    OscillatorWavetable * getOscillatorGenerator(int index)
-    {
-        return &generatorContainer.oscillatorGenerators[index];
-    }
-    FrequencyModulationWavetable * getFrequencyModulationGenerator(int index)
-    {
-        return &generatorContainer.frequencyModulationGenerators[index];
-    }
-    AmplitudeModulationWavetable * getAmplitudeModulationGenerator(int index)
-    {
-        return &generatorContainer.amplitudeModulationGenerators[index];
-    }
-    RingModulationWavetable * getRingModulationGenerator(int index)
-    {
-        return &generatorContainer.ringModulationGenerators[index];
-    }*/
-    
-    void setFreeGenerator(int index)
-    {
-        switch(synthSettings.getWaveType())
-        {
-            case SineWave:
-            {
-                
-            }
-            case SawWave:
-            {
-                generatorContainer.sawWaveGenerators[index].setInUse(false);
-                return;
-            }
-            case TriangleWave:
-            {
-                generatorContainer.triangleWaveGenerators[index].setInUse(false);
-            }
-            case SquareWave:
-            {
-                generatorContainer.squareWaveGenerators[index].setInUse(false);
-            }
-            case Pulse:
-            {
-                
-            }
-            case Summed:
-            {
-                
-            }
-            case Oscillator:
-            {
-                generatorContainer.oscillatorGenerators[index].setInUse(false);
-                return;
-            }
-            case FrequencyModulation:
-            {
-                generatorContainer.frequencyModulationGenerators[index].setInUse(false);
-                return;
-            }
-            case AmplitudeModulation:
-            {
-                generatorContainer.amplitudeModulationGenerators[index].setInUse(false);
-                return;
-            }
-            case RingModulation:
-            {
-                generatorContainer.ringModulationGenerators[index].setInUse(false);
-                return;
-            }
-        }
-    }
-
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    void calcEnvelopeStage(WaveInstance & waveInstance, SegmentInstance & segmentInstance)
-    {
-        if (!segmentInstance.bVolumeChange)
-        {
-            waveInstance.volume = segmentInstance.volumeEnd;
-            if (segmentInstance.sampleDuration <= waveInstance.currentSampleCount)
-            {
-                waveInstance.currentSampleCount = 0;
-                waveInstance.stage = getNextStage(waveInstance.stage);
-            }
-        } else
-        {
-            if (segmentInstance.sampleDuration >= waveInstance.currentSampleCount)
-            {
-                waveInstance.volume = segmentInstance.curveExponential[waveInstance.curveIndex];
-                waveInstance.curveIndex++;
-            } else
-            {
-                waveInstance.curveIndex = 0;
-                waveInstance.currentSampleCount = 0;
-                waveInstance.stage = getNextStage(waveInstance.stage);
-            }
-        }
-    }
-    void calcEnvelopeRelease(WaveInstance & waveInstance, SegmentInstance & segmentInstance)
-    {
-        
-    }
-    EnvelopeStage getNextStage(EnvelopeStage stage)
-    {
-        if (stage == EnvelopeDelay)
-        {
-            return EnvelopeAttack;
-        } else if (stage == EnvelopeAttack)
-        {
-            return EnvelopeDecay;
-        } else if (stage == EnvelopeDecay)
-        {
-            return EnvelopeSustain;
-        } else if (stage == EnvelopeSustain)
-        {
-            return EnvelopeRelease;
-        } else if (stage == EnvelopeRelease)
-        {
-            return EnvelopeEnd;
-        }
-    }
     void processAudio(ofSoundBuffer &in, ofSoundBuffer &out)
     {
         int numFrames = out.getNumFrames();
@@ -645,54 +323,58 @@ public:
         float sample = 0.0;
         for (int w = 0; w < waveInstances.size(); w++)
         {
-            if (!waveInstances[w].bFree && waveInstances[w].bStart)
+            if (waveInstances[w].getInUse())
             {
+                waveInstances[w].generate();
+                //TODO enevlope
                 for (int i = 0; i < numFrames; i++)
                 {
-                    switch(waveInstances[w].stage)
+                    out[i] = waveInstances[w].samples[i];
+                    /*switch(waveInstanceStructs[w].stage)
                     {
                         case EnvelopeStart:
                         {
-                            waveInstances[w].curveIndex = 0;
-                            waveInstances[w].stage = EnvelopeDelay;
+                            waveInstanceStructs[w].curveIndex = 0;
+                            waveInstanceStructs[w].stage = EnvelopeDelay;
                             break;
                         }
                         case EnvelopeDelay:
                         {
-                            calcEnvelopeStage(waveInstances[w], synthPresetInstance.envelopeInstance.segmentDelay);
+                            calcEnvelopeStage(waveInstanceStructs[w], synthPresetInstance.envelopeInstance.segmentDelay);
                             break;
                         }
                         case EnvelopeAttack:
                         {
-                            calcEnvelopeStage(waveInstances[w], synthPresetInstance.envelopeInstance.segmentAttack);
+                            calcEnvelopeStage(waveInstanceStructs[w], synthPresetInstance.envelopeInstance.segmentAttack);
                             break;
                         }
                         case EnvelopeDecay:
                         {
-                            calcEnvelopeStage(waveInstances[w], synthPresetInstance.envelopeInstance.segmentDecay);
+                            calcEnvelopeStage(waveInstanceStructs[w], synthPresetInstance.envelopeInstance.segmentDecay);
                             break;
                         }
                         case EnvelopeSustain:
                         {
-                            calcEnvelopeStage(waveInstances[w], synthPresetInstance.envelopeInstance.segmentsSustain[0]);
+                            calcEnvelopeStage(waveInstanceStructs[w], synthPresetInstance.envelopeInstance.segmentsSustain[0]);
                             break;
                         }
                         case EnvelopeRelease:
                         {
-                            calcEnvelopeStage(waveInstances[w], synthPresetInstance.envelopeInstance.segmentRelease);
+                            calcEnvelopeStage(waveInstanceStructs[w], synthPresetInstance.envelopeInstance.segmentRelease);
                             break;
                         }
                         case EnvelopeEnd:
                         {
-                            setFree(waveInstances[w]);
+                            setFree(waveInstanceStructs[w]);
                             break;
                         }
                         case EnvelopeCutoff:
                         {
                             //Do cutoff
                         }
-                    }
-                    switch (synthSettings.getWaveType())
+                    }*/
+                    
+                    /*switch (synthSettings.getWaveType())
                     {
                         case SineWave:
                         {
@@ -700,23 +382,23 @@ public:
                         }
                         case SawWave:
                         {
-                            sample = generatorContainer.sawWaveGenerators[waveInstances[w].generatorIndex].generateSample() * waveInstances[w].volume;
-                            waveInstances[w].samples[i*numChannels] = sample;
-                            waveInstances[w].samples[i*numChannels+1] = sample;
+                            sample = waveInstances[w].samples[i]; //* envelopeGenerator.volume[i];
+                            samples[i*numChannels] = sample;
+                            samples[i*numChannels+1] = sample;
                             break;
                         }
                         case TriangleWave:
                         {
-                            sample = generatorContainer.triangleWaveGenerators[waveInstances[w].generatorIndex].generateSample() * waveInstances[w].volume;
-                            waveInstances[w].samples[i*numChannels] = sample;
-                            waveInstances[w].samples[i*numChannels+1] = sample;
+                            sample = generatorContainerClass.triangleWaveGenerators[waveInstanceStructs[w].generatorIndex].generateSample() * waveInstanceStructs[w].volume;
+                            samples[i*numChannels] = sample;
+                            samples[i*numChannels+1] = sample;
                             break;
                         }
                         case SquareWave:
                         {
-                            sample = generatorContainer.squareWaveGenerators[waveInstances[w].generatorIndex].generateSample() * waveInstances[w].volume;
-                            waveInstances[w].samples[i*numChannels] = sample;
-                            waveInstances[w].samples[i*numChannels+1] = sample;
+                            sample = generatorContainerClass.squareWaveGenerators[waveInstanceStructs[w].generatorIndex].generateSample() * waveInstanceStructs[w].volume;
+                            waveInstanceStructs[w].samples[i*numChannels] = sample;
+                            waveInstanceStructs[w].samples[i*numChannels+1] = sample;
                         }
                         case Pulse:
                         {
@@ -728,34 +410,34 @@ public:
                         }
                         case Oscillator:
                         {
-                            sample = generatorContainer.oscillatorGenerators[waveInstances[w].generatorIndex].generateSample() * 1.0;
-                            waveInstances[w].samples[i*numChannels] = sample;
-                            waveInstances[w].samples[i*numChannels+1] = sample;
+                            sample = generatorContainerClass.oscillatorGenerators[waveInstanceStructs[w].generatorIndex].generateSample() * 1.0;
+                            waveInstanceStructs[w].samples[i*numChannels] = sample;
+                            waveInstanceStructs[w].samples[i*numChannels+1] = sample;
                             break;
                         }
                         case FrequencyModulation:
                         {
-                            sample = generatorContainer.frequencyModulationGenerators[waveInstances[w].generatorIndex].generateSample() * waveInstances[w].volume;
-                            waveInstances[w].samples[i*numChannels] = sample;
-                            waveInstances[w].samples[i*numChannels+1] = sample;
+                            sample = generatorContainerClass.frequencyModulationGenerators[waveInstanceStructs[w].generatorIndex].generateSample() * waveInstanceStructs[w].volume;
+                            waveInstanceStructs[w].samples[i*numChannels] = sample;
+                            waveInstanceStructs[w].samples[i*numChannels+1] = sample;
                             break;
                         }
                         case AmplitudeModulation:
                         {
-                            sample = generatorContainer.amplitudeModulationGenerators[waveInstances[w].generatorIndex].generateSample() * waveInstances[w].volume;
-                            waveInstances[w].samples[i*numChannels] = sample;
-                            waveInstances[w].samples[i*numChannels+1] = sample;
+                            sample = generatorContainerClass.amplitudeModulationGenerators[waveInstanceStructs[w].generatorIndex].generateSample() * waveInstanceStructs[w].volume;
+                            waveInstanceStructs[w].samples[i*numChannels] = sample;
+                            waveInstanceStructs[w].samples[i*numChannels+1] = sample;
                             break;
                         }
                         case RingModulation:
                         {
-                            sample = generatorContainer.ringModulationGenerators[waveInstances[w].generatorIndex].generateSample() * waveInstances[w].volume;
-                            waveInstances[w].samples[i*numChannels] = sample;
-                            waveInstances[w].samples[i*numChannels+1] = sample;
+                            sample = generatorContainerClass.ringModulationGenerators[waveInstanceStructs[w].generatorIndex].generateSample() * waveInstanceStructs[w].volume;
+                            waveInstanceStructs[w].samples[i*numChannels] = sample;
+                            waveInstanceStructs[w].samples[i*numChannels+1] = sample;
                             break;
                         }
                     }
-                    waveInstances[w].currentSampleCount++;
+                    waveInstanceStructs[w].stageSampleCount++;*/
                 }
             }
         }
@@ -798,16 +480,16 @@ public:
         
         if (waveInstances.size() > 0)
         {
+            int n = WaveInstance::getActivateWaveInstances();
             for (int i = 0; i < waveInstances.size(); i++)
             {
-                if (!waveInstances[i].bFree)
+                if (!waveInstances[i].getInUse())
                 {
                     int left = 0;
                     for (int right = 1; right < AUDIO_BUFFER_SIZE; right+=2, left+=2)
                     {
-                        
-                        out.getBuffer()[left] += waveInstances[i].samples[left] * (1.0/activeWaveInstanceCount) * mixerPanning.left;
-                        out.getBuffer()[right] += waveInstances[i].samples[right] * (1.0/activeWaveInstanceCount) * mixerPanning.right;
+                        out.getBuffer()[left] += waveInstances[i].samples[left] * (1.0/n) * mixerPanning.left;
+                        out.getBuffer()[right] += waveInstances[i].samples[right] * (1.0/n) * mixerPanning.right;
                         //cout << mixerPanning.left  << "\n";
                         //if ((out.getBuffer()[b] > 1.0) || (out.getBuffer()[b] < -1.0))
                         //{

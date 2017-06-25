@@ -288,9 +288,10 @@ public:
     }
     virtual float generateSample()
     {
+        float value = SynthUtil::getWavetableValue(wavetableIndex, index);
         index += indexIncrement;
         index = indexWrapWavetable(index);
-        return SynthUtil::getWavetableValue(wavetableIndex, index);
+        return value;
     }
 protected:
     bool bInUse;
