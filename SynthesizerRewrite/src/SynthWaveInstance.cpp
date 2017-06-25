@@ -6,7 +6,7 @@
 //
 //
 
-#include <SynthWaveInstance.h>
+#include <SynthWaveInstance.hpp>
 
 WaveInstance::GeneratorContainer WaveInstance::generatorContainer;
 int WaveInstance::activeWaveInstance;

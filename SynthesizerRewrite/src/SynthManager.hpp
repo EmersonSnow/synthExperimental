@@ -8,9 +8,9 @@
 
 #pragma once
 
-#include "SynthDefinition.h"
-#include "SynthPreset.h"
-#include "SynthWaveManager.h"
+#include "SynthDefinition.hpp"
+#include "SynthPresetManager.hpp"
+#include "SynthWaveManager.hpp"
 
 class SynthManager : ofBaseSoundOutput
 {

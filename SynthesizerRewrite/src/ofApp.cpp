@@ -23,17 +23,26 @@ void ofApp::setup(){
     waveManager->start();*/
     
     //soundStream.setOutput(audioMixer);
-    synthSettings.setWaveType(FrequencyModulation);
+    //synthSettings.setWaveType(FrequencyModulation);
+    synthPresetManager.currentPresetInstance.waveType = Oscillator;
     int i = synthWaveManager.getWaveInstance();
     //synthWaveManager.getWaveInstanceGenerator(i);
     synthWaveManager.startWaveInstance(i);
     //WaveInstanceStruct * wave = synthWaveManager.getWaveInstance(440.0);;
     //synthWaveManager.startWaveInstance(*wave);
     //synthWaveManager.playDoAllWaveInstance(440.0);
+    
+    /*synthPresetManager.setWaveType(Oscillator);
+    WaveInstance wave(440.0);
+    wave.start();
+    audioMixer.addInput(&wave);
+    soundStream.setup(AUDIO_CHANNEL_NUMBER, 0, AUDIO_SAMPLE_RATE, AUDIO_BUFFER_SIZE, 1);
+    soundStream.setOutput(audioMixer);*/
 }
 
 //--------------------------------------------------------------
 void ofApp::update(){
+    synthWaveManager.update();
 }
 
 //--------------------------------------------------------------

@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include "SynthSettings.h"
-#include "SynthGenerators.h"
+#include "SynthPresetManager.hpp"
+#include "SynthGenerators.hpp"
 
 class WaveInstance
 {
@@ -17,12 +17,10 @@ public:
     WaveInstance(float frequency = 440.0)
     {
         bInUse = false;
-        //bStart = false;
         bGenerator = false;
-        //stage = EnvelopeStart;
-        //stageSampleCount = 0;
         generatorIndex = 0;
         this->frequency = frequency;
+        
     }
     
     void reset(bool bInUse = false, float frequency = 440.0)
@@ -54,7 +52,7 @@ public:
     {
         if (!bGenerator)
             return;
-        switch(synthSettings.getWaveType())
+        switch(synthPresetManager.getWaveType())
         {
             case SineWave:
             {
@@ -108,7 +106,7 @@ public:
     }
     void getGenerator()
     {
-        switch(synthSettings.getWaveType())
+        switch(synthPresetManager.getWaveType())
         {
             case SineWave:
             {
@@ -167,7 +165,7 @@ public:
                 generatorContainer.squareWaveGenerators.push_back(*new SquareWaveGenerator);
                 int index = generatorContainer.squareWaveGenerators.size()-1;
                 generatorContainer.squareWaveGenerators[index].setInUse(true);
-                SquareWaveData squareWaveData = synthSettings.getSquareWaveData();
+                SquareWaveData squareWaveData = synthPresetManager.getSquareWaveData();
                 generatorContainer.squareWaveGenerators[index].setup(frequency, squareWaveData.dutyCycle, squareWaveData.amplitudeMin, squareWaveData.amplitudeMax);
                 bGenerator = true;
                 generatorIndex = index;
@@ -195,8 +193,9 @@ public:
                 }
                 generatorContainer.oscillatorGenerators.push_back(*new OscillatorWavetable);
                 int index = generatorContainer.oscillatorGenerators.size()-1;
+                cout << "Index " << index << "\n";
                 generatorContainer.oscillatorGenerators[index].setInUse(true);
-                OscillatorData oscillatorData = synthSettings.getOscillatorData();
+                OscillatorData oscillatorData = synthPresetManager.getOscillatorData();
                 generatorContainer.oscillatorGenerators[index].setup(frequency, oscillatorData.numberPartials, &oscillatorData.partials[0], &oscillatorData.amplitude[0], oscillatorData.gibbs);
                 bGenerator = true;
                 generatorIndex = index;
@@ -216,7 +215,7 @@ public:
                 generatorContainer.frequencyModulationGenerators.push_back(*new FrequencyModulationWavetable);
                 int index = generatorContainer.frequencyModulationGenerators.size()-1;
                 generatorContainer.frequencyModulationGenerators[index].setInUse(true);
-                ModulationData frequencyModulationData = synthSettings.getFrequencyModulationData();
+                ModulationData frequencyModulationData = synthPresetManager.getFrequencyModulationData();
                 generatorContainer.frequencyModulationGenerators[index].setup(frequency, frequencyModulationData.modulationMultiplier, frequencyModulationData.modulationAmplitude);
                 bGenerator = true;
                 generatorIndex = index;
@@ -236,7 +235,7 @@ public:
                 generatorContainer.amplitudeModulationGenerators.push_back(*new AmplitudeModulationWavetable);
                 int index = generatorContainer.amplitudeModulationGenerators.size()-1;
                 generatorContainer.amplitudeModulationGenerators[index].setInUse(true);
-                ModulationData amplitudeModulationData = synthSettings.getAmplitudeModulationData();
+                ModulationData amplitudeModulationData = synthPresetManager.getAmplitudeModulationData();
                 generatorContainer.amplitudeModulationGenerators[index].setup(frequency, amplitudeModulationData.modulationMultiplier, amplitudeModulationData.modulationAmplitude);
                 bGenerator = true;
                 generatorIndex = index;
@@ -256,7 +255,7 @@ public:
                 generatorContainer.ringModulationGenerators.push_back(*new RingModulationWavetable);
                 int index = generatorContainer.ringModulationGenerators.size()-1;
                 generatorContainer.ringModulationGenerators[index].setInUse(true);
-                ModulationData ringModulationData = synthSettings.getRingModulationData();
+                ModulationData ringModulationData = synthPresetManager.getRingModulationData();
                 generatorContainer.ringModulationGenerators[index].setup(frequency, ringModulationData.modulationMultiplier, ringModulationData.modulationAmplitude);
                 bGenerator = true;
                 generatorIndex = index;
@@ -279,12 +278,44 @@ public:
         return activeWaveInstance;
     }
     
-    void generate()
+    /*int getReadBufferIndex()
+    {
+        return bufferReadIndex;
+    }
+    int getWriteBufferIndex();
+    {
+        return 0;
+    }
+    void readBuffer()
+    {
+        if (++bufferReadIndex == WAVE_INSTANCE_BUFFER)
+        {
+            bufferReadIndex = 0;
+        }
+        bufferReadCount++;
+    }
+    void writeBuffer()
+    {
+        if (!(bufferReadCount > (bufferWriteCount-(WAVE_INSTANCE_BUFFER-1))))
+            return;
+        
+        if (++0 == WAVE_INSTANCE_BUFFER)
+        {
+            0 = 0;
+        }
+        generateBuffer();
+        bufferWriteCount++;
+    }
+    void update()
+    {
+        writeBuffer();
+    }*/
+    /*void generate()
     {
         float sample;
         for (int i = 0; i < AUDIO_BUFFER_SIZE; i++)
         {
-            switch (synthSettings.getWaveType())
+            switch (synthPresetManager.getWaveType())
             {
                 case SineWave:
                 {
@@ -348,6 +379,59 @@ public:
                 }
             }
         }
+    }*/
+    float generate()
+    {
+        switch (synthPresetManager.getWaveType())
+        {
+            case SineWave:
+            {
+                
+            }
+            case SawWave:
+            {
+                return generatorContainer.sawWaveGenerators[generatorIndex].generateSample();
+                break;
+            }
+            case TriangleWave:
+            {
+                return generatorContainer.triangleWaveGenerators[generatorIndex].generateSample();
+                break;
+            }
+            case SquareWave:
+            {
+                return generatorContainer.squareWaveGenerators[generatorIndex].generateSample();
+            }
+            case Pulse:
+            {
+                break;
+            }
+            case Summed:
+            {
+                break;
+            }
+            case Oscillator:
+            {
+                return generatorContainer.oscillatorGenerators[0].generateSample();
+                break;
+            }
+            case FrequencyModulation:
+            {
+                return generatorContainer.frequencyModulationGenerators[generatorIndex].generateSample();
+                break;
+            }
+            case AmplitudeModulation:
+            {
+                return  generatorContainer.amplitudeModulationGenerators[generatorIndex].generateSample();
+                break;
+            }
+            case RingModulation:
+            {
+                return generatorContainer.ringModulationGenerators[generatorIndex].generateSample();
+                break;
+            }
+        }
+
     }
     float samples[AUDIO_BUFFER_SIZE*2];
     
@@ -356,6 +440,11 @@ private:
     bool bGenerator;
     int generatorIndex;
     float frequency;
+    
+    //int bufferWriteIndex;
+    //int bufferReadIndex;
+    //int bufferWriteCount;
+    //int bufferReadCount;
     //float volume;
     
     struct GeneratorContainer

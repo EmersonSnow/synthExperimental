@@ -8,6 +8,6 @@
 
 #pragma once
 
-#include "SynthDefinition.h"
-#include "SynthGenerators.h"
+#include "SynthDefinition.hpp"
+#include "SynthGenerators.hpp"
 

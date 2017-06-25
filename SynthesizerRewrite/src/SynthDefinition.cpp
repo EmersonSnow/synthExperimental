@@ -6,7 +6,7 @@
 //
 //
 
-#include <SynthDefinition.h>
+#include <SynthDefinition.hpp>
 
 
 float SynthUtil::noteFrequencies[MIDI_NOTE_NUMBER];

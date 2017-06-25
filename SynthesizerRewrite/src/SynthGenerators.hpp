@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "SynthDefinition.h"
+#include "SynthDefinition.hpp"
 
 class WaveGeneratorBase
 {
@@ -410,7 +410,7 @@ public:
         value /= scale;
         if (value > 1 || value < -1)
         {
-            cout << value << "\n";
+        //    cout << value << "\n";
         }
         index += indexIncrement;
         index = indexWrapWavetable(index);

@@ -8,7 +8,9 @@
 
 #pragma once
 
-#include "SynthWaveInstance.h"
+#include "SynthDefinition.hpp"
+#include "SynthPresetManager.hpp"
+#include "SynthWaveInstance.hpp"
 
 struct WaveInstanceStruct
 {
@@ -32,14 +34,14 @@ public:
     {
         stageSampleCount = 0;
         index = 0;
-        volume = 0.0;
+        //volume = 0.0;
         stage = EnvelopeStart;
     }
     void reset()
     {
         stageSampleCount = 0;
         index = 0;
-        volume = 0;
+        //volume = 0;
         stage = EnvelopeStart;
     }
     void getStage()
@@ -58,27 +60,27 @@ public:
             }
             case EnvelopeDelay:
             {
-                return calcEnvelopeStage(synthSettings.currentPresetInstance.envelopeInstance.segmentDelay);
+                return calcEnvelopeStage(synthPresetManager.currentPresetInstance.envelopeInstance.segmentDelay);
                 break;
             }
             case EnvelopeAttack:
             {
-                return calcEnvelopeStage(synthSettings.currentPresetInstance.envelopeInstance.segmentAttack);
+                return calcEnvelopeStage(synthPresetManager.currentPresetInstance.envelopeInstance.segmentAttack);
                 break;
             }
             case EnvelopeDecay:
             {
-                return calcEnvelopeStage(synthSettings.currentPresetInstance.envelopeInstance.segmentDecay);
+                return calcEnvelopeStage(synthPresetManager.currentPresetInstance.envelopeInstance.segmentDecay);
                 break;
             }
             case EnvelopeSustain:
             {
-                return calcEnvelopeStage(synthSettings.currentPresetInstance.envelopeInstance.segmentsSustain[0]);
+                return calcEnvelopeStage(synthPresetManager.currentPresetInstance.envelopeInstance.segmentSustain);
                 break;
             }
             case EnvelopeRelease:
             {
-                return calcEnvelopeStage(synthSettings.currentPresetInstance.envelopeInstance.segmentRelease);
+                return calcEnvelopeStage(synthPresetManager.currentPresetInstance.envelopeInstance.segmentRelease);
                 break;
             }
             case EnvelopeEnd:
@@ -94,16 +96,19 @@ public:
         }
     }
     
-    void calcEnvelopeStage(SegmentInstance & segmentInstance)
+    float calcEnvelopeStage(SegmentInstance & segmentInstance)
     {
+        float volume;
         if (!segmentInstance.bVolumeChange)
         {
             volume = segmentInstance.volumeEnd;
             if (segmentInstance.sampleDuration <= stageSampleCount)
             {
+                volume = segmentInstance.volumeEnd;
                 stageSampleCount = 0;
                 stage = getNextStage(stage);
             }
+            return volume;
         } else
         {
             if (segmentInstance.sampleDuration >= stageSampleCount)
@@ -112,10 +117,12 @@ public:
                 index++;
             } else
             {
+                volume = segmentInstance.volumeEnd;
                 index = 0;
                 stageSampleCount = 0;
                 stage = getNextStage(stage);
             }
+            return volume;
         }
     }
     void calcEnvelopeCutoff(WaveInstanceStruct & waveInstanceStruct, SegmentInstance & segmentInstance)
@@ -144,7 +151,7 @@ public:
 private:
     int stageSampleCount;
     int index;
-    float volume;
+    //float volume;
     EnvelopeStage stage;
 };
 
@@ -154,19 +161,6 @@ private:
     ofSoundBuffer workingBuffer;
     ofSoundStream soundStream;
     
-    struct GeneratorContainerClass
-    {
-        vector<SawWaveGenerator> sawWaveGenerators;
-        vector<TriangleWaveGenerator> triangleWaveGenerators;
-        vector<SquareWaveGenerator> squareWaveGenerators;
-        
-        vector<OscillatorWavetable> oscillatorGenerators;
-        vector<FrequencyModulationWavetable> frequencyModulationGenerators;
-        vector<AmplitudeModulationWavetable> amplitudeModulationGenerators;
-        vector<RingModulationWavetable> ringModulationGenerators;
-        
-    } generatorContainerClass;
-    
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -174,7 +168,6 @@ private:
     bool bSynthPresetInialised;
     SynthPreset synthPreset;
     SynthPresetInstance synthPresetInstance;
-    CurveExponentGenerator curveExponentGenerator;
     
     //int activewaveInstanceStructCount;
     //vector<WaveInstanceStruct> waveInstanceStructs;
@@ -202,11 +195,17 @@ public:
         soundStream.setup(AUDIO_CHANNEL_NUMBER, 0, AUDIO_SAMPLE_RATE, AUDIO_BUFFER_SIZE, 1);
         soundStream.setOutput(this);
         
-        loadSynthPreset(synthSettings.currnetPreset);
-        inialiseSynthPreset();
+        //loadSynthPreset(synthPresetManager.currentPreset);
+        //inialiseSynthPreset();
     }
     
-    
+    void update()
+    {
+        /*for (int i = 0; i < waveInstances.size(); i++)
+        {
+            waveInstances[i].update();
+        }*/
+    }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -214,67 +213,8 @@ public:
     {
         bSynthPresetLoaded = true;
         this->synthPreset = synthPreset;
+        this->synthPresetInstance = synthPresetManager.inialiseSynthPresetInstance(synthPreset);
     }
-    void inialiseSynthPreset()
-    {
-        if (!bSynthPresetLoaded)
-            return;
-        
-        //TEMP
-        //synthPresetInstance.panning = synthPreset.panning;
-        synthPresetInstance.panning.left = 1.0;
-        synthPresetInstance.panning.right = 1.0;
-        inialiseSegmentInstance(synthPreset.envelope.segmentDelay,
-                                synthPresetInstance.envelopeInstance.segmentDelay);
-        
-        inialiseSegmentInstance(synthPreset.envelope.segmentAttack,
-                                synthPresetInstance.envelopeInstance.segmentAttack);
-        
-        inialiseSegmentInstance(synthPreset.envelope.segmentDecay,
-                                synthPresetInstance.envelopeInstance.segmentDecay);
-        
-        
-        synthPresetInstance.envelopeInstance.segmentsSustain.clear();
-        for (int i = 0; i < synthPreset.envelope.segmentsSustain.size(); i++)
-        {
-            synthPresetInstance.envelopeInstance.segmentsSustain.push_back(*new SegmentInstance);
-            inialiseSegmentInstance(synthPreset.envelope.segmentsSustain[i],
-                                    synthPresetInstance.envelopeInstance.segmentsSustain[i]);
-        }
-        
-        inialiseSegmentInstance(synthPreset.envelope.segmentDecay,
-                                synthPresetInstance.envelopeInstance.segmentDecay);
-        
-        inialiseSegmentInstance(synthPreset.envelope.segmentRelease,
-                                synthPresetInstance.envelopeInstance.segmentRelease);
-        
-        bSynthPresetInialised = true;
-    }
-    void inialiseSegmentInstance(Segment &segment, SegmentInstance &segmentInstance)
-    {
-        segmentInstance.duration = segment.duration;
-        segmentInstance.sampleDuration = segment.duration * (float) AUDIO_SAMPLE_RATE;
-        segmentInstance.volumeStart = segment.volumeStart;
-        segmentInstance.volumeEnd = segment.volumeEnd;
-        if (segmentInstance.volumeEnd == segment.volumeStart)
-        {
-            segmentInstance.bVolumeChange = false;
-        } else
-        {
-            segmentInstance.bVolumeChange = true;
-        }
-        segmentInstance.exponential = segment.exponential;
-        bool bAscending = (segmentInstance.volumeStart < segmentInstance.volumeEnd) ? true : false;
-        
-        curveExponentGenerator.generate(segmentInstance.sampleDuration, segmentInstance.exponential, bAscending);
-        curveExponentGenerator.generateMappedCurve(segment.volumeStart, segment.volumeEnd);
-        if (segmentInstance.bVolumeChange)
-            segmentInstance.curveExponential = curveExponentGenerator.curveMapped;
-        curveExponentGenerator.clear();
-    }
-    
-    
-    
     
     
     
@@ -325,11 +265,12 @@ public:
         {
             if (waveInstances[w].getInUse())
             {
-                waveInstances[w].generate();
                 //TODO enevlope
                 for (int i = 0; i < numFrames; i++)
                 {
-                    out[i] = waveInstances[w].samples[i];
+                    sample = waveInstances[w].generate();
+                    out[i*numChannels] = sample;
+                    out[i*numChannels+1]= sample;
                     /*switch(waveInstanceStructs[w].stage)
                     {
                         case EnvelopeStart:

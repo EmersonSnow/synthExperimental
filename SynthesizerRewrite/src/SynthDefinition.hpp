@@ -43,6 +43,7 @@
 #define AUDIO_CHANNEL_NUMBER 2
 
 #define WAVE_MANAGER_NUMBER 10
+#define WAVE_INSTANCE_BUFFER 2
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -125,7 +126,7 @@ struct Envelope
     Segment segmentDelay;
     Segment segmentAttack;
     Segment segmentDecay;
-    vector<Segment> segmentsSustain;
+    Segment segmentSustain;
     Segment segmentRelease;
 };
 struct EnvelopeInstance
@@ -133,7 +134,7 @@ struct EnvelopeInstance
     SegmentInstance segmentDelay;
     SegmentInstance segmentAttack;
     SegmentInstance segmentDecay;
-    vector<SegmentInstance> segmentsSustain;
+    SegmentInstance segmentSustain;
     SegmentInstance segmentRelease;
 };
 enum EnvelopeStage
@@ -163,6 +164,10 @@ struct SynthPresetInstance
 {
     WaveType waveType;
     Panning panning;
+    
+    OscillatorData oscillatorData;
+    ModulationData modulationData;
+    SquareWaveData squareWaveData;
     
     EnvelopeInstance envelopeInstance;
 };
