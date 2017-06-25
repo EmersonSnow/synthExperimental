@@ -209,7 +209,7 @@ private:
     float amplitudeMin;
 };
 //TODO: Add sinewave wavetable based generator, add summed, and looking into wavetables for squared, saw and triangle
-class WavetableBase
+class WavetableBase : public WaveGeneratorBase
 {
 public:
     WavetableBase()
@@ -227,26 +227,10 @@ public:
         setWaveType(waveType);
         reset(index);
     }
-    inline bool setInUse(bool b)
-    {
-        bInUse = b;
-    }
-    inline bool getInUse()
-    {
-        return bInUse;
-    }
     virtual void reset(float index = 0)
     {
         this->index = index;
         indexIncrement = frequency * SynthUtil::getFrequencyTableIndex();
-    }
-    inline void setFrequency(float frequency)
-    {
-        this->frequency = frequency;
-    }
-    inline float getFrequency()
-    {
-        return frequency;
     }
     virtual void modulate(float frequencyValue)
     {
@@ -294,12 +278,16 @@ public:
         return value;
     }
 protected:
-    bool bInUse;
     int wavetableIndex;
-    float index;
-    float indexIncrement;
-    float frequency;
     WaveType waveType;
+};
+class PulseWavetable : public WavetableBase
+{
+public:
+    virtual void setup(float frequency)
+    {
+        WavetableBase::setupBase(frequency, Pulse);
+    }
 };
 class OscillatorWavetable : public WavetableBase
 {

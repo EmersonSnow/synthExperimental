@@ -11,148 +11,11 @@
 #include "SynthDefinition.hpp"
 #include "SynthPresetManager.hpp"
 #include "SynthWaveInstance.hpp"
+#include "SynthEnvelopeGenerator.hpp"
 
-struct WaveInstanceStruct
+struct WaveDevices
 {
-    bool bFree;
-    bool bStart;
-    bool bGenerator;
-    EnvelopeStage stage;
-    int stageSampleCount;
-    int curveIndex;
-    int generatorIndex;
-    float frequency;
-    float volume;
-    float samples[AUDIO_BUFFER_SIZE*2];
-};
-
-class EnvelopeGenerator
-{
-public:
     
-    EnvelopeGenerator()
-    {
-        stageSampleCount = 0;
-        index = 0;
-        //volume = 0.0;
-        stage = EnvelopeStart;
-    }
-    void reset()
-    {
-        stageSampleCount = 0;
-        index = 0;
-        //volume = 0;
-        stage = EnvelopeStart;
-    }
-    void getStage()
-    {
-        return stage;
-    }
-    float generate()
-    {
-        switch(stage)
-        {
-            case EnvelopeStart:
-            {
-                index = 0;
-                stage = EnvelopeDelay;
-                break;
-            }
-            case EnvelopeDelay:
-            {
-                return calcEnvelopeStage(synthPresetManager.currentPresetInstance.envelopeInstance.segmentDelay);
-                break;
-            }
-            case EnvelopeAttack:
-            {
-                return calcEnvelopeStage(synthPresetManager.currentPresetInstance.envelopeInstance.segmentAttack);
-                break;
-            }
-            case EnvelopeDecay:
-            {
-                return calcEnvelopeStage(synthPresetManager.currentPresetInstance.envelopeInstance.segmentDecay);
-                break;
-            }
-            case EnvelopeSustain:
-            {
-                return calcEnvelopeStage(synthPresetManager.currentPresetInstance.envelopeInstance.segmentSustain);
-                break;
-            }
-            case EnvelopeRelease:
-            {
-                return calcEnvelopeStage(synthPresetManager.currentPresetInstance.envelopeInstance.segmentRelease);
-                break;
-            }
-            case EnvelopeEnd:
-            {
-                reset();
-                break;
-            }
-            case EnvelopeCutoff:
-            {
-                //Do cutoff
-                break;
-            }
-        }
-    }
-    
-    float calcEnvelopeStage(SegmentInstance & segmentInstance)
-    {
-        float volume;
-        if (!segmentInstance.bVolumeChange)
-        {
-            volume = segmentInstance.volumeEnd;
-            if (segmentInstance.sampleDuration <= stageSampleCount)
-            {
-                volume = segmentInstance.volumeEnd;
-                stageSampleCount = 0;
-                stage = getNextStage(stage);
-            }
-            return volume;
-        } else
-        {
-            if (segmentInstance.sampleDuration >= stageSampleCount)
-            {
-                volume = segmentInstance.curveExponential[index];
-                index++;
-            } else
-            {
-                volume = segmentInstance.volumeEnd;
-                index = 0;
-                stageSampleCount = 0;
-                stage = getNextStage(stage);
-            }
-            return volume;
-        }
-    }
-    void calcEnvelopeCutoff(WaveInstanceStruct & waveInstanceStruct, SegmentInstance & segmentInstance)
-    {
-        
-    }
-    EnvelopeStage getNextStage(EnvelopeStage stage)
-    {
-        if (stage == EnvelopeDelay)
-        {
-            return EnvelopeAttack;
-        } else if (stage == EnvelopeAttack)
-        {
-            return EnvelopeDecay;
-        } else if (stage == EnvelopeDecay)
-        {
-            return EnvelopeSustain;
-        } else if (stage == EnvelopeSustain)
-        {
-            return EnvelopeRelease;
-        } else if (stage == EnvelopeRelease)
-        {
-            return EnvelopeEnd;
-        }
-    }
-private:
-    int stageSampleCount;
-    int index;
-    //float volume;
-    EnvelopeStage stage;
 };
 
 class SynthWaveManager : public ofBaseSoundOutput
@@ -172,6 +35,8 @@ private:
     //int activewaveInstanceStructCount;
     //vector<WaveInstanceStruct> waveInstanceStructs;
     vector<WaveInstance> waveInstances;
+    vector<EnvelopeGenerator> envelopeGenerators;
+    vector<ofSoundBuffer> soundBuffers;
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -229,7 +94,7 @@ public:
         int index;
         for (int i = 0; i < waveInstances.size(); i++)
         {
-            if (waveInstances[i].getInUse())
+            if (!waveInstances[i].getInUse())
             {
                 index = i;
                 bCreateNewInstance = false;
@@ -238,19 +103,32 @@ public:
         }
         if (bCreateNewInstance)
         {
-            WaveInstance waveInstance;
-            waveInstances.push_back(waveInstance);
+            waveInstances.push_back(*new WaveInstance);
             index = waveInstances.size()-1;
+            waveInstances[index].setEnvelopeIndex(index);
             return index;
         } else
         {
             waveInstances[index].setFrequency(frequency);
+            waveInstances[index].setEnvelopeIndex(index);
             return index;
         }
     }
     void startWaveInstance(int index)
     {
         waveInstances[index].start();
+    }
+    int getEnevelopGenerator()
+    {
+        for (int i = 0; i < waveInstances.size(); i++)
+        {
+            if (!envelopeGenerators[i].getInUse())
+            {
+                return i;
+            }
+        }
+        envelopeGenerators.push_back(*new EnvelopeGenerator);
+        return waveInstances.size()-1;
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -268,9 +146,9 @@ public:
                 //TODO enevlope
                 for (int i = 0; i < numFrames; i++)
                 {
-                    sample = waveInstances[w].generate();
-                    out[i*numChannels] = sample;
-                    out[i*numChannels+1]= sample;
+                    sample = waveInstances[w].generate() * envelopeGenerators[waveInstances[w].getEnvelopeIndex()].generate();
+                    out[i*numChannels] = sample ;
+                    out[i*numChannels+1] = sample;
                     /*switch(waveInstanceStructs[w].stage)
                     {
                         case EnvelopeStart:
@@ -323,7 +201,7 @@ public:
                         }
                         case SawWave:
                         {
-                            sample = waveInstances[w].samples[i]; //* envelopeGenerator.volume[i];
+                            sample = waveInstances[w].samples[i]; // envelopeGenerator.volume[i];
                             samples[i*numChannels] = sample;
                             samples[i*numChannels+1] = sample;
                             break;

@@ -10,8 +10,9 @@
 
 #include "SynthPresetManager.hpp"
 #include "SynthGenerators.hpp"
+#include "SynthClassBase.hpp"
 
-class WaveInstance
+class WaveInstance : public SynthClassBase
 {
 public:
     WaveInstance(float frequency = 440.0)
@@ -19,36 +20,27 @@ public:
         bInUse = false;
         bGenerator = false;
         generatorIndex = 0;
+        envelopeIndex = 0;
         this->frequency = frequency;
         
     }
-    
     void reset(bool bInUse = false, float frequency = 440.0)
     {
         if (!this->bInUse && bInUse)
             activeWaveInstance--;
         
+        setGeneratorFree();
         setInUse(bInUse);
-        //bStart = false;
         bGenerator = false;
-        //stage = EnvelopeStart;
-        //stageSampleCount = 0;
         generatorIndex = 0;
+        envelopeIndex = 0;
         frequency = frequency;
-    }
-    void setInUse(bool b)
-    {
-        bInUse = b;
-    }
-    bool getInUse()
-    {
-        return bInUse;
     }
     void setFrequency(float f)
     {
         frequency = f;
     }
-    void setFree()
+    void setGeneratorFree()
     {
         if (!bGenerator)
             return;
@@ -102,7 +94,6 @@ public:
                 break;
             }
         }
-        reset();
     }
     void getGenerator()
     {
@@ -263,7 +254,14 @@ public:
             }
         }
     }
-
+    void setEnvelopeIndex(int i)
+    {
+        envelopeIndex = i;
+    }
+    int getEnvelopeIndex()
+    {
+        return envelopeIndex;
+    }
     void start()
     {
         if (!bGenerator)
@@ -436,9 +434,9 @@ public:
     float samples[AUDIO_BUFFER_SIZE*2];
     
 private:
-    bool bInUse;
     bool bGenerator;
     int generatorIndex;
+    int envelopeIndex;
     float frequency;
     
     //int bufferWriteIndex;
@@ -452,7 +450,7 @@ private:
         vector<SawWaveGenerator> sawWaveGenerators;
         vector<TriangleWaveGenerator> triangleWaveGenerators;
         vector<SquareWaveGenerator> squareWaveGenerators;
-        
+        vector<PulseWavetable> pulseGenerators;
         vector<OscillatorWavetable> oscillatorGenerators;
         vector<FrequencyModulationWavetable> frequencyModulationGenerators;
         vector<AmplitudeModulationWavetable> amplitudeModulationGenerators;

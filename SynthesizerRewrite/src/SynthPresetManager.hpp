@@ -24,7 +24,10 @@ public:
     }
     void loadPreset(){}
     void savePreset(){}
-    
+    SynthPresetInstance & getCurrentPreset()
+    {
+        return currentPresetInstance;
+    }
     SynthPresetInstance inialiseSynthPresetInstance(SynthPreset & synthPreset)
     {
         SynthPresetInstance synthPresetInstance;
